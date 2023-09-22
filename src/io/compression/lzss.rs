@@ -30,7 +30,7 @@ pub fn encode(input: &[u8]) -> Vec<u8> {
 
     let mut r = N_F;
     let stop_pos = input.len();
-    
+
     let mut code: [u8; 17] = [0; 17];
     for i in s..r { context.buffer[i] = FILL }
     while len < F && input_idx < stop_pos {
@@ -55,7 +55,7 @@ pub fn encode(input: &[u8]) -> Vec<u8> {
             code_idx += 1;
             code[code_idx] = (
                 ((encoded_position >> 3) & 0xf0) |
-                (context.match_length - (THRESHOLD + 1))
+                    (context.match_length - (THRESHOLD + 1))
             ) as u8;
             code_idx += 1;
         }
@@ -301,6 +301,3 @@ impl Context {
         }
     }
 }
-
-
-        

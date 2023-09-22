@@ -1,2 +1,2 @@
 mod compression;
-mod binarization;
+mod binary;
