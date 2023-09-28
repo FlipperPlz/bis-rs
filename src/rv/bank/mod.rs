@@ -1,14 +1,13 @@
 use std::borrow::ToOwned;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
 
 const MAGIC_DECOMPRESSED: i32    = 0x00000000;
 const MAGIC_COMPRESSED:   i32    = 0x43707273;
 const MAGIC_ENCRYPTED:    i32    = 0x456e6372;
 const MAGIC_VERSION:      i32    = 0x56657273;
 const PROPERTY_PREFIX:    &str   = "prefix";
-pub type NodeID = usize;
+pub type NodeID =         usize;
 
 pub struct Archive {
     name:         String,
@@ -19,14 +18,12 @@ pub struct Archive {
 
 pub struct FolderNode {
     name:         String,
-    archive:      Arc<Archive>,
     parent:       NodeID,
     children:     Vec<NodeID>
 }
 
 pub struct FileNode {
     name:         String,
-    archive:      Arc<Archive>,
     parent:       NodeID,
     format:       DataFormat,
     file_offset:  usize,
@@ -76,6 +73,18 @@ impl std::fmt::Display for EntryError {
 impl Error for EntryError {}
 
 impl Archive {
+    pub fn iter(&self) -> NodeIterator {
+        self.into_iter()
+    }
+
+    pub fn iter_folder(&self, folder: &FolderNode) -> NodeIterator {
+        if let Some(first_child) = folder.children.first() {
+            NodeIterator::new(self, *first_child)
+        } else {
+            NodeIterator::new(self, self.root)
+        }
+    }
+
     pub fn get_prefix(&self) -> &String {
         match self.properties.get(&*PROPERTY_PREFIX) {
             None => &self.name,
@@ -108,22 +117,24 @@ impl Archive {
             }
         })
     }
-}
 
-impl Archive {
-    pub fn get_root(&self) -> &FolderNode {
+    pub fn get_root_node(&self) -> &FolderNode {
         self.get_directory_node(self.root).unwrap()
     }
 }
 
 impl Node {
-    pub fn get_parent(&self) -> &FolderNode {
-        let (archive, parent) = match self {
-            Node::File(file) => (&file.archive, file.parent),
-            Node::Folder(folder) => (&folder.archive, folder.parent)
-        };
-
-        archive.get_directory_node(parent).unwrap()
+    pub fn get_parent_node_id(&self) -> NodeID {
+        match self {
+            Node::File(file) => file.parent,
+            Node::Folder(folder) => folder.parent
+        }
+    }
+    pub fn get_parent_node<'a>(&self, archive: &'a Archive) -> Result<&'a FolderNode, EntryError> {
+        match archive.get_directory_node(self.get_parent_node_id()) {
+            Some(folder) => Ok(folder),
+            None => Err(EntryError::NodeNotFound),
+        }
     }
 
     pub fn get_name(&self) -> &String {
@@ -134,26 +145,23 @@ impl Node {
     }
 }
 
-impl<'a> Iterator for NodeIterator<'a> {
-    type Item = &'a Node;
+impl<'a> NodeIterator<'a> {
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.archive.get_node(self.stack.pop()?)
+    pub fn new(archive: &'a Archive, start: NodeID) -> NodeIterator<'a> {
+        NodeIterator {
+            archive,
+            stack: vec![start],
+        }
     }
-}
 
-impl<'a> IntoIterator for &'a FolderNode {
-    type Item = &'a Node;
-    type IntoIter = NodeIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let mut iterator = NodeIterator {
-            archive: &Arc::as_ref(&self.archive),
-            stack: vec![]
-        };
-        iterator.stack.extend(self.children.iter());
-
-        iterator
+    fn push_children(&mut self, node_id: NodeID) {
+        if let Some(node) = self.archive.get_node(node_id) {
+            if let Node::Folder(folder) = node {
+                for child_id in &folder.children {
+                    self.stack.push(*child_id);
+                }
+            }
+        }
     }
 }
 
@@ -162,9 +170,16 @@ impl<'a> IntoIterator for &'a Archive {
     type IntoIter = NodeIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.get_root().into_iter()
+        NodeIterator::new(self, self.root)
     }
 }
 
+impl<'a> Iterator for NodeIterator<'a> {
+    type Item = &'a Node;
 
-
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_node_id = self.stack.pop()?;
+        self.push_children(next_node_id);
+        self.archive.get_node(next_node_id)
+    }
+}

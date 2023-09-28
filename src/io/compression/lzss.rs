@@ -25,7 +25,6 @@ pub fn encode(input: &[u8]) -> Vec<u8> {
     let mut mask: u8 = 1;
     let mut input_idx: usize = 0;
     let mut code_idx: usize = 1;
-    let mut code_size: usize = 0;
     let mut s: usize = 0;
 
     let mut r = N_F;
@@ -94,7 +93,6 @@ pub fn encode(input: &[u8]) -> Vec<u8> {
 
     if code_idx > 1 {
         compressed_buffer.extend_from_slice(&code[0..code_idx]);
-        code_size += code_idx
     }
 
     return compressed_buffer
