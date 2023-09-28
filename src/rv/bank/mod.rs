@@ -7,7 +7,7 @@ const MAGIC_DECOMPRESSED: i32    = 0x00000000;
 const MAGIC_COMPRESSED:   i32    = 0x43707273;
 const MAGIC_ENCRYPTED:    i32    = 0x456e6372;
 const MAGIC_VERSION:      i32    = 0x56657273;
-const PROPERTY_PREFIX:    String = String::from("prefix");
+const PROPERTY_PREFIX:    &str   = "prefix";
 pub type NodeID = usize;
 
 pub struct Archive {
@@ -84,14 +84,11 @@ impl Archive {
     }
 
     pub fn set_prefix(&mut self, prefix: &str) -> Option<String> {
-        self.properties.insert(PROPERTY_PREFIX, prefix.to_owned())
+        self.properties.insert(PROPERTY_PREFIX.to_string(), prefix.to_owned())
     }
 
     pub fn get_node(&self, id: NodeID) -> Option<&Node> {
-        match self.nodes.get(&id) {
-            None => None,
-            Some(it) => it
-        }
+        self.nodes.get(&id)
     }
 
     pub fn get_directory_node(&self, id: NodeID) -> Option<&FolderNode> {
@@ -115,7 +112,7 @@ impl Archive {
 
 impl Archive {
     pub fn get_root(&self) -> &FolderNode {
-        self.get_directory_node(self.root)?
+        self.get_directory_node(self.root).unwrap()
     }
 }
 
@@ -126,7 +123,7 @@ impl Node {
             Node::Folder(folder) => (&folder.archive, folder.parent)
         };
 
-        archive.get_directory_node(parent)?
+        archive.get_directory_node(parent).unwrap()
     }
 
     pub fn get_name(&self) -> &String {
@@ -165,16 +162,7 @@ impl<'a> IntoIterator for &'a Archive {
     type IntoIter = NodeIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self.get_root() {
-            Some(Node::Folder(folder)) => NodeIterator {
-                archive: self,
-                stack: folder.children.iter().collect(),
-            },
-            _ => NodeIterator {
-                archive: self,
-                stack: vec![],
-            }
-        }
+        self.get_root().into_iter()
     }
 }
 
