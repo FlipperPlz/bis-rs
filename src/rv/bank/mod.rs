@@ -374,6 +374,7 @@ fn ensure_file(file: &BankEntry) -> VfsResult<()> {
 impl Debinarizable for BankFsImpl {
 
     fn debinarize(reader: &mut impl Read + Seek) -> Result<Self, Box<dyn Error>> {
+        #[derive(Clone)]
         struct EntryInfo<'a> {
             filename:          String,
             mime:              i32,
@@ -383,25 +384,79 @@ impl Debinarizable for BankFsImpl {
             packed_size:       i32,
         }
 
-        let read_info = || -> EntryInfo {
-            let filename = read_utf8z(reader);
-            let mime = reader.read_i32::<LittleEndian>()?;
-            let original_size = reader.read_i32::<LittleEndian>()?;
-            let deprecated_offset = reader.read_i32::<LittleEndian>()?;
-            let timestamp = reader.read_i32::<LittleEndian>()?;
-            let packed_size = reader.read_i32::<LittleEndian>()?;
-            EntryInfo {
-                filename,
-                mime,
-                original_size,
-                deprecated_offset,
-                timestamp,
-                packed_size,
+        impl EntryInfo {
+
+            #[inline]
+            fn blank(&self) -> bool {
+                self.filename.is_empty() &&
+                self.mime == MAGIC_DECOMPRESSED &&
+                self.original_size == 0 &&
+                self.deprecated_offset == 0 &&
+                self.timestamp == 0 &&
+                self.packed_size == 0
             }
+
+            #[inline]
+            fn version(&self) -> bool {
+                self.mime == MAGIC_VERSION
+            }
+
+            #[inline]
+            fn decompressed(&self) -> bool {
+                self.mime == MAGIC_DECOMPRESSED
+            }
+
+            #[inline]
+            fn encrypted(&self) -> bool {
+                self.mime == MAGIC_ENCRYPTED
+            }
+
+            #[inline]
+            fn compressed(&self) -> bool {
+                self.mime == MAGIC_COMPRESSED
+            }
+        }
+
+        let read_info = |info: &mut EntryInfo| {
+            info.filename = read_utf8z(reader);
+            info.mime = reader.read_i32::<LittleEndian>()?;
+            info.original_size = reader.read_i32::<LittleEndian>()?;
+            info.deprecated_offset = reader.read_i32::<LittleEndian>()?;
+            info.timestamp = reader.read_i32::<LittleEndian>()?;
+            info.packed_size = reader.read_i32::<LittleEndian>()?;
         };
 
-        loop {
-            let entry = read_info();
+        let read_props = || -> HashMap<String, String> {
+            let mut properties = HashMap::new();
+            loop {
+                let name = read_utf8z(reader);
+                if name.is_empty() {
+                    return properties
+                }
+                let value = read_utf8z(reader);
+                properties.insert(name, value);
+            }
+
+            properties
+        };
+
+        let mut entry = EntryInfo  {
+            filename: "".to_string(),
+            mime: 0,
+            original_size: 0,
+            deprecated_offset: 0,
+            timestamp: 0,
+            packed_size: 0,
+        };
+        read_info(&mut entry);
+        if !entry.version() {
+            Err("oof")
+        }
+        let properties = read_props();
+
+        let mut entries: Vec<EntryInfo> = Vec::new();
+        while !entry.blank() {
+            entries.push(entry.clone())
         }
 
         todo!()
