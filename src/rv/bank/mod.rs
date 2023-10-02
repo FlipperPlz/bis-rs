@@ -1,11 +1,15 @@
 use std::{cmp, fmt, mem};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, RwLock};
 use vfs::{FileSystem, SeekAndRead, VfsFileType, VfsMetadata, VfsResult};
 use vfs::error::VfsErrorKind;
+use byteorder::{ReadBytesExt, LittleEndian};
+
+use crate::io::binary::{Debinarizable, read_utf8z};
 
 const MAGIC_DECOMPRESSED: i32    = 0x00000000;
 const MAGIC_COMPRESSED:   i32    = 0x43707273;
@@ -365,5 +369,42 @@ fn ensure_file(file: &BankEntry) -> VfsResult<()> {
         return Err(VfsErrorKind::Other("Not a file".into()).into());
     }
     Ok(())
+}
+
+impl Debinarizable for BankFsImpl {
+
+    fn debinarize(reader: &mut impl Read + Seek) -> Result<Self, Box<dyn Error>> {
+        struct EntryInfo<'a> {
+            filename:          String,
+            mime:              i32,
+            original_size:     i32,
+            deprecated_offset: i32,
+            timestamp:         i32,
+            packed_size:       i32,
+        }
+
+        let read_info = || -> EntryInfo {
+            let filename = read_utf8z(reader);
+            let mime = reader.read_i32::<LittleEndian>()?;
+            let original_size = reader.read_i32::<LittleEndian>()?;
+            let deprecated_offset = reader.read_i32::<LittleEndian>()?;
+            let timestamp = reader.read_i32::<LittleEndian>()?;
+            let packed_size = reader.read_i32::<LittleEndian>()?;
+            EntryInfo {
+                filename,
+                mime,
+                original_size,
+                deprecated_offset,
+                timestamp,
+                packed_size,
+            }
+        };
+
+        loop {
+            let entry = read_info();
+        }
+
+        todo!()
+    }
 }
 

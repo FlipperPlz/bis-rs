@@ -1,2 +1,2 @@
 mod compression;
-mod binary;
+pub mod binary;
