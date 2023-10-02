@@ -8,3 +8,9 @@ edition = "2021"
 [dependencies]
 vfs = "0.9.0"
 log = "0.4.20"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = 3
