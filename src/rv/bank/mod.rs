@@ -22,6 +22,7 @@ pub struct BankFs {
     handle:               BankFsHandle
 }
 
+
 impl Debug for BankFs {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("In Memory Bank File System")
@@ -53,9 +54,6 @@ impl BankFs {
 }
 
 impl FileSystem for BankFs {
-
-
-
     fn read_dir(&self, path: &str) -> VfsResult<Box<dyn Iterator<Item=String> + Send>> {
         let normalized_path = BankFsImpl::normalize_path(path, true);
         let handle = self.handle.read().unwrap();
@@ -201,7 +199,7 @@ impl FileSystem for BankFs {
 #[derive()]
 struct EntryInfo {
     filename:          String,
-    mime:              i32,
+    mime:              EntryMime,
     original_size:     i32,
     deprecated_offset: i32,
     timestamp:         i32,
@@ -210,9 +208,9 @@ struct EntryInfo {
 
 impl EntryInfo {
     #[inline]
-    fn read_entry_meta(reader: &mut impl Read, max_name_length: usize) -> Result<EntryInfo, Box<dyn std::error::Error>> {
-        let filename = read_utf8z(reader, max_name_length);
-        let mime = reader.read_i32::<LittleEndian>()?;
+    fn read_entry_meta(reader: &mut impl Read, options: &BankReadOptions) -> Result<EntryInfo, Box<dyn std::error::Error>> {
+        let filename = read_utf8z(reader, options.max_entry_name_length);
+        let mime: EntryMime = EntryMime::from(reader.read_i32::<LittleEndian>()?);
         let original_size = reader.read_i32::<LittleEndian>()?;
         let deprecated_offset = reader.read_i32::<LittleEndian>()?;
         let timestamp = reader.read_i32::<LittleEndian>()?;
@@ -232,31 +230,11 @@ impl EntryInfo {
     #[inline]
     fn blank(&self) -> bool {
         self.filename.is_empty() &&
-        self.mime == MAGIC_DECOMPRESSED &&
+        self.mime == EntryMime::Decompressed &&
         self.original_size == 0 &&
         self.deprecated_offset == 0 &&
         self.timestamp == 0 &&
         self.packed_size == 0
-    }
-
-    #[inline]
-    fn version(&self) -> bool {
-        self.mime == MAGIC_VERSION
-    }
-
-    #[inline]
-    fn decompressed(&self) -> bool {
-        self.mime == MAGIC_DECOMPRESSED
-    }
-
-    #[inline]
-    fn encrypted(&self) -> bool {
-        self.mime == MAGIC_ENCRYPTED
-    }
-
-    #[inline]
-    fn compressed(&self) -> bool {
-        self.mime == MAGIC_COMPRESSED
     }
 }
 
@@ -266,23 +244,65 @@ impl BankFsImpl {
         reader: &mut impl SeekAndRead,
         options: BankReadOptions
     ) -> Result<Self, BankDebinarizationError> {
-        let mut version_found: bool;
         let mut properties: HashMap<String, String> = HashMap::new();
-        {
-            let mut current_entry = EntryInfo::read_entry_meta(reader, options.max_entry_name_length)?;
-            if options.require_version_entry && !current_entry.version() {
-                return Err(BankDebinarizationError::FirstNotVersion)
-            } else {
+        let data_entries = {
+            let mut version_found: bool = false;
+            let mut current_entry = EntryInfo::read_entry_meta(reader, &options)?;
+            let mut entries: Vec<EntryInfo> = vec![];
+
+            if current_entry.mime == EntryMime::Version {
                 version_found = true;
-                read_properties(reader, &mut properties, options)
+                read_properties(reader, &mut properties, &options)
+            } else if options.require_version_entry {
+                return Err(BankDebinarizationError::FirstNotVersion)
             }
 
+            while entries.len() < options.max_entry_count {
+                current_entry = EntryInfo::read_entry_meta(reader, &options)?;
+                if current_entry.blank() {
+                    break;
+                }
+
+                if current_entry.mime == EntryMime::Version {
+                    //Options & Errors: What If Version Entry Is Not Zeroed Out?
+                    if !version_found {
+                        version_found = true;
+                        read_properties(reader, &mut properties, &options);
+                        continue
+                    }
+
+                    match options.multiple_version_strategy {
+                        MultipleVersionStrategy::Forbid => {
+                            return Err(BankDebinarizationError::VersionNotFound)
+                        }
+                        MultipleVersionStrategy::Allow { should_read_props } => {
+                            if !should_read_props {
+                                continue
+                            }
+                            read_properties(reader, &mut properties, &options)
+
+                        }
+                    }
+
+                }
+
+                entries.push(current_entry)
+            }
+            entries
+        };
+        let header_end = reader.stream_position()?;
+        
+        match options.offset_location_strategy {
+            OffsetLocationStrategy::Deprecated => {}
+            OffsetLocationStrategy::Calculate { ignore_impossible } => {
+                let mut data_offset = header_end as usize;
+            }
         }
         todo!()
     }
 }
 
-pub enum DataLocationMethod {
+pub enum OffsetLocationStrategy {
     ///Respect offsets written inside of the entry meta 
     Deprecated,
     Calculate {
@@ -291,10 +311,44 @@ pub enum DataLocationMethod {
 
 }
 
+#[derive(PartialEq)]
+enum EntryMime {
+    Decompressed,
+    Version,
+    Compressed,
+    Encrypted
+}
+
+impl From<i32> for EntryMime {
+    fn from(value: i32) -> Self {
+        match value {
+            MAGIC_DECOMPRESSED => Self::Decompressed,
+            MAGIC_COMPRESSED => Self::Compressed,
+            MAGIC_ENCRYPTED => Self::Encrypted,
+            MAGIC_VERSION => Self::Version,
+            _ => panic!("Unknown entry mime! this was not in the script boss, mayday D:")
+        }
+    }
+}
+
+pub enum MultipleVersionStrategy {
+    Forbid,
+    Allow {
+        should_read_props: bool
+    }
+}
+
+impl Default for MultipleVersionStrategy {
+    fn default() -> Self {
+        Self::Forbid
+    }
+}
+
 pub struct BankReadOptions {
+    multiple_version_strategy:  MultipleVersionStrategy,
+    offset_location_strategy:   OffsetLocationStrategy,
     require_version_first:      bool,
     require_version_entry:      bool,
-    respect_deprecated_offsets: DataLocationMethod,
     ignore_unused_properties:   bool,
     max_entry_count:            usize,
     max_entry_name_length:      usize,
@@ -304,7 +358,7 @@ pub struct BankReadOptions {
     max_property_length:        [usize; 2]
 }
 
-impl Default for DataLocationMethod {
+impl Default for OffsetLocationStrategy {
     fn default() -> Self {
         Self::Calculate {
             ignore_impossible: true,
@@ -317,7 +371,8 @@ impl Default for BankReadOptions {
         Self {
             require_version_first: true,
             require_version_entry: true,
-            respect_deprecated_offsets: DataLocationMethod::default(),
+            multiple_version_strategy: MultipleVersionStrategy::default(),
+            offset_location_strategy: OffsetLocationStrategy::default(),
             ignore_unused_properties: true,
             max_entry_count: usize::MAX,
             max_entry_name_length: 1024,
@@ -331,7 +386,7 @@ impl Default for BankReadOptions {
 
 
 
-fn read_properties(reader: &mut impl Read, properties: &mut HashMap<String, String>, options: BankReadOptions ) {
+fn read_properties(reader: &mut impl Read, properties: &mut HashMap<String, String>, options: &BankReadOptions ) {
     loop {
         let name = read_utf8z(reader, options.max_property_length[0]);
         if name.is_empty() {
@@ -361,6 +416,7 @@ pub enum BankDebinarizationError {
     StringTooLong,
     FirstNotVersion,
     VersionNotFound,
+    MultipleVersionsFound,
     ImpossibleDataOffset,
     DecompressionError,
     DecryptionError,
@@ -393,10 +449,10 @@ impl Display for BankDebinarizationError {
                 write!(f, "Bank Debinarization Error: The checksum does not match the one calculated. "),
             BankDebinarizationError::Obfuscated =>
                 write!(f, "Bank Debinarization Error: The options are configured to prohibit obfuscated banks. "),
+            BankDebinarizationError::MultipleVersionsFound =>
+                write!(f, "Bank Debinarization Error: Multiple version entries were found within the bank supplied, this is configured to be disabled."),
             BankDebinarizationError::Other(s) =>
                 write!(f, "Bank Debinarization Error: {}", s),
-
-
         }
     }
 }
@@ -404,9 +460,6 @@ impl Display for BankDebinarizationError {
 impl Error for BankDebinarizationError {
 
 }
-
-
-
 //--------------------------------------------------------------------------------------------------
 struct BankFsImpl {
     name:                 String,
@@ -483,22 +536,13 @@ impl BankFsImpl {
 
         result.iter().collect()
     }
-
 }
-
-
-
-
 //--------------------------------------------------------------------------------------------------
 struct BankEntry {
     file_type:            VfsFileType,
     #[allow(clippy::rc_buffer)]
     content:              Arc<EntryContent>,
 }
-
-
-
-
 //--------------------------------------------------------------------------------------------------
 struct WritableFile {
     content:              Cursor<EntryContent>,
@@ -529,10 +573,6 @@ impl Drop for WritableFile {
         );
     }
 }
-
-
-
-
 //--------------------------------------------------------------------------------------------------
 struct ReadableFile  {
     #[allow(clippy::rc_buffer)]
