@@ -2,14 +2,12 @@ use std::{cmp, fmt, mem};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, RwLock};
+use byteorder::{LittleEndian, ReadBytesExt};
 use vfs::{FileSystem, SeekAndRead, VfsFileType, VfsMetadata, VfsResult};
 use vfs::error::VfsErrorKind;
-use byteorder::{ReadBytesExt, LittleEndian};
-
-use crate::io::binary::{Debinarizable, read_utf8z};
 
 const MAGIC_DECOMPRESSED: i32    = 0x00000000;
 const MAGIC_COMPRESSED:   i32    = 0x43707273;
@@ -199,6 +197,215 @@ impl FileSystem for BankFs {
         Ok(())
     }
 }
+//--------------------------------------------------------------------------------------------------
+#[derive()]
+struct EntryInfo {
+    filename:          String,
+    mime:              i32,
+    original_size:     i32,
+    deprecated_offset: i32,
+    timestamp:         i32,
+    packed_size:       i32,
+}
+
+impl EntryInfo {
+    #[inline]
+    fn read_entry_meta(reader: &mut impl Read, max_name_length: usize) -> Result<EntryInfo, Box<dyn std::error::Error>> {
+        let filename = read_utf8z(reader, max_name_length);
+        let mime = reader.read_i32::<LittleEndian>()?;
+        let original_size = reader.read_i32::<LittleEndian>()?;
+        let deprecated_offset = reader.read_i32::<LittleEndian>()?;
+        let timestamp = reader.read_i32::<LittleEndian>()?;
+        let packed_size = reader.read_i32::<LittleEndian>()?;
+
+        let entry = EntryInfo {
+            filename,
+            mime,
+            original_size,
+            deprecated_offset,
+            timestamp,
+            packed_size,
+        };
+
+        Ok(entry)
+    }
+    #[inline]
+    fn blank(&self) -> bool {
+        self.filename.is_empty() &&
+        self.mime == MAGIC_DECOMPRESSED &&
+        self.original_size == 0 &&
+        self.deprecated_offset == 0 &&
+        self.timestamp == 0 &&
+        self.packed_size == 0
+    }
+
+    #[inline]
+    fn version(&self) -> bool {
+        self.mime == MAGIC_VERSION
+    }
+
+    #[inline]
+    fn decompressed(&self) -> bool {
+        self.mime == MAGIC_DECOMPRESSED
+    }
+
+    #[inline]
+    fn encrypted(&self) -> bool {
+        self.mime == MAGIC_ENCRYPTED
+    }
+
+    #[inline]
+    fn compressed(&self) -> bool {
+        self.mime == MAGIC_COMPRESSED
+    }
+}
+
+impl BankFsImpl {
+
+    pub fn debinarize(
+        reader: &mut impl SeekAndRead,
+        options: BankReadOptions
+    ) -> Result<Self, BankDebinarizationError> {
+        let mut version_found: bool;
+        let mut properties: HashMap<String, String> = HashMap::new();
+        {
+            let mut current_entry = EntryInfo::read_entry_meta(reader, options.max_entry_name_length)?;
+            if options.require_version_entry && !current_entry.version() {
+                return Err(BankDebinarizationError::FirstNotVersion)
+            } else {
+                version_found = true;
+                read_properties(reader, &mut properties, options)
+            }
+
+        }
+        todo!()
+    }
+}
+
+pub enum DataLocationMethod {
+    ///Respect offsets written inside of the entry meta 
+    Deprecated,
+    Calculate {
+        ignore_impossible:     bool
+    }
+
+}
+
+pub struct BankReadOptions {
+    require_version_first:      bool,
+    require_version_entry:      bool,
+    respect_deprecated_offsets: DataLocationMethod,
+    ignore_unused_properties:   bool,
+    max_entry_count:            usize,
+    max_entry_name_length:      usize,
+    keep_empty_entries:         bool,
+    allow_obfuscated:           bool,
+    require_valid_checksum:     bool,
+    max_property_length:        [usize; 2]
+}
+
+impl Default for DataLocationMethod {
+    fn default() -> Self {
+        Self::Calculate {
+            ignore_impossible: true,
+        }
+    }
+}
+
+impl Default for BankReadOptions {
+    fn default() -> Self {
+        Self {
+            require_version_first: true,
+            require_version_entry: true,
+            respect_deprecated_offsets: DataLocationMethod::default(),
+            ignore_unused_properties: true,
+            max_entry_count: usize::MAX,
+            max_entry_name_length: 1024,
+            keep_empty_entries: false,
+            allow_obfuscated: false,
+            require_valid_checksum: true,
+            max_property_length: [1024, 1024],
+        }
+    }
+}
+
+
+
+fn read_properties(reader: &mut impl Read, properties: &mut HashMap<String, String>, options: BankReadOptions ) {
+    loop {
+        let name = read_utf8z(reader, options.max_property_length[0]);
+        if name.is_empty() {
+            return;
+        }
+        //TODO: Option: Ignore Unused Prefix
+        let value = read_utf8z(reader, options.max_property_length[1]);
+        properties.insert(name, value);
+    }
+}
+
+fn read_utf8z(reader: &mut impl Read, cool_down: usize) -> String{
+    let mut bytes = Vec::new();
+    while bytes.len() < cool_down {
+        let mut byte = [0; 1];
+        reader.read_exact(&mut byte).unwrap();
+        if byte[0] == 0 {
+            break;
+        }
+        bytes.push(byte[0]);
+    }
+    String::from_utf8(bytes).unwrap()
+}
+
+#[derive(Debug)]
+pub enum BankDebinarizationError {
+    StringTooLong,
+    FirstNotVersion,
+    VersionNotFound,
+    ImpossibleDataOffset,
+    DecompressionError,
+    DecryptionError,
+    InvalidChecksum,
+    Obfuscated,
+    Other(String)
+}
+impl From<Box<dyn Error>> for BankDebinarizationError {
+    fn from(err: Box<dyn Error>) -> BankDebinarizationError {
+        BankDebinarizationError::Other(format!("An error occurred: {}", err))
+    }
+}
+
+impl Display for BankDebinarizationError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            BankDebinarizationError::StringTooLong =>
+            write!(f, "Bank Debinarization Error: A string has exceeded the maximum length defined in the debinarization options."),
+            BankDebinarizationError::FirstNotVersion =>
+                write!(f, "Bank Debinarization Error: The current options are configured to require a version entry to be the first in the bank. "),
+            BankDebinarizationError::VersionNotFound =>
+                write!(f, "Bank Debinarization Error: The current options are configured to require a version entry and none were found. "),
+            BankDebinarizationError::ImpossibleDataOffset =>
+                write!(f, "Bank Debinarization Error: The current options are configured to error out when offsets are invalidated. "),
+            BankDebinarizationError::DecompressionError =>
+                write!(f, "Bank Debinarization Error: There was an error while decompressing an entry. "),
+            BankDebinarizationError::DecryptionError =>
+                write!(f, "Bank Debinarization Error: There was an error while decrypting an entry. "),
+            BankDebinarizationError::InvalidChecksum =>
+                write!(f, "Bank Debinarization Error: The checksum does not match the one calculated. "),
+            BankDebinarizationError::Obfuscated =>
+                write!(f, "Bank Debinarization Error: The options are configured to prohibit obfuscated banks. "),
+            BankDebinarizationError::Other(s) =>
+                write!(f, "Bank Debinarization Error: {}", s),
+
+
+        }
+    }
+}
+
+impl Error for BankDebinarizationError {
+
+}
+
+
 
 //--------------------------------------------------------------------------------------------------
 struct BankFsImpl {
@@ -208,6 +415,7 @@ struct BankFsImpl {
 }
 
 impl BankFsImpl {
+    
     pub fn new(name: &str) -> Self {
         let mut files = HashMap::new();
         files.insert("".to_string(), BankEntry {
@@ -369,97 +577,5 @@ fn ensure_file(file: &BankEntry) -> VfsResult<()> {
         return Err(VfsErrorKind::Other("Not a file".into()).into());
     }
     Ok(())
-}
-
-impl Debinarizable for BankFsImpl {
-
-    fn debinarize(reader: &mut impl Read + Seek) -> Result<Self, Box<dyn Error>> {
-        #[derive(Clone)]
-        struct EntryInfo<'a> {
-            filename:          String,
-            mime:              i32,
-            original_size:     i32,
-            deprecated_offset: i32,
-            timestamp:         i32,
-            packed_size:       i32,
-        }
-
-        impl EntryInfo {
-
-            #[inline]
-            fn blank(&self) -> bool {
-                self.filename.is_empty() &&
-                self.mime == MAGIC_DECOMPRESSED &&
-                self.original_size == 0 &&
-                self.deprecated_offset == 0 &&
-                self.timestamp == 0 &&
-                self.packed_size == 0
-            }
-
-            #[inline]
-            fn version(&self) -> bool {
-                self.mime == MAGIC_VERSION
-            }
-
-            #[inline]
-            fn decompressed(&self) -> bool {
-                self.mime == MAGIC_DECOMPRESSED
-            }
-
-            #[inline]
-            fn encrypted(&self) -> bool {
-                self.mime == MAGIC_ENCRYPTED
-            }
-
-            #[inline]
-            fn compressed(&self) -> bool {
-                self.mime == MAGIC_COMPRESSED
-            }
-        }
-
-        let read_info = |info: &mut EntryInfo| {
-            info.filename = read_utf8z(reader);
-            info.mime = reader.read_i32::<LittleEndian>()?;
-            info.original_size = reader.read_i32::<LittleEndian>()?;
-            info.deprecated_offset = reader.read_i32::<LittleEndian>()?;
-            info.timestamp = reader.read_i32::<LittleEndian>()?;
-            info.packed_size = reader.read_i32::<LittleEndian>()?;
-        };
-
-        let read_props = || -> HashMap<String, String> {
-            let mut properties = HashMap::new();
-            loop {
-                let name = read_utf8z(reader);
-                if name.is_empty() {
-                    return properties
-                }
-                let value = read_utf8z(reader);
-                properties.insert(name, value);
-            }
-
-            properties
-        };
-
-        let mut entry = EntryInfo  {
-            filename: "".to_string(),
-            mime: 0,
-            original_size: 0,
-            deprecated_offset: 0,
-            timestamp: 0,
-            packed_size: 0,
-        };
-        read_info(&mut entry);
-        if !entry.version() {
-            Err("oof")
-        }
-        let properties = read_props();
-
-        let mut entries: Vec<EntryInfo> = Vec::new();
-        while !entry.blank() {
-            entries.push(entry.clone())
-        }
-
-        todo!()
-    }
 }
 
