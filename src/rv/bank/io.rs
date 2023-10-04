@@ -2,18 +2,17 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 use std::io::{Read};
 use byteorder::{LittleEndian, ReadBytesExt};
 use log::debug;
 use vfs::SeekAndRead;
 use crate::rv::bank::{BankFsImpl, PROPERTY_PREFIX};
 
-
 const MAGIC_DECOMPRESSED: i32    = 0x00000000;
 const MAGIC_COMPRESSED:   i32    = 0x43707273;
 const MAGIC_ENCRYPTED:    i32    = 0x456e6372;
 const MAGIC_VERSION:      i32    = 0x56657273;
-
 
 #[derive(Clone)]
 struct EntryInfo {
@@ -25,29 +24,27 @@ struct EntryInfo {
     packed_size:       i32,
 }
 
+#[derive(Debug)]
+pub enum BankDebinarizationError {
+    StringTooLong,
+    FirstNotVersion,
+    VersionNotFound,
+    MultipleVersionsFound,
+    ImpossibleDataOffset,
+    DecompressionError,
+    VersionNotBlanked,
+    DecryptionError,
+    InvalidChecksum,
+    Obfuscated,
+    Other(String)
+}
+
 pub enum OffsetLocationStrategy {
     Deprecated,
     Calculate
 }
 
-
-#[derive(PartialEq)]
-pub enum ErrorStrategy {
-    Allow,
-    Deny,
-    Ignore
-}
-
-
-pub enum MultipleVersionStrategy {
-    Forbid,
-    Allow {
-        should_read_props:       bool
-
-    }
-}
-
-pub struct BankReadOptions {
+pub struct BankSkimOptions {
     multiple_version_strategy:  MultipleVersionStrategy,
     offset_location_strategy:   OffsetLocationStrategy,
     allow_offsets_to_header:    ErrorStrategy,
@@ -63,6 +60,33 @@ pub struct BankReadOptions {
     max_property_length:        [usize; 2]
 }
 
+pub struct SkimmedBank {
+    bank_name:         String,
+    entries:           Vec<EntryInfo>,
+    properties:        HashMap<String, String>
+}
+
+pub struct SkimmedBankOffsets {
+    bank_start:             u64,
+    buffer_start:           u64,
+    last_calculated_offset: i64,
+    header_length:          u64
+}
+
+#[derive(PartialEq)]
+pub enum ErrorStrategy {
+    Allow,
+    Deny,
+    Ignore
+}
+
+pub enum MultipleVersionStrategy {
+    Forbid,
+    Allow {
+        should_read_props:       bool
+    }
+}
+
 #[derive(PartialEq, Clone)]
 enum EntryMime {
     Decompressed,
@@ -71,27 +95,175 @@ enum EntryMime {
     Encrypted
 }
 
-impl EntryInfo {
-    #[inline]
-    fn read_entry_meta(reader: &mut impl Read, options: &BankReadOptions) -> Result<EntryInfo, Box<dyn Error>> {
-        let filename = read_utf8z(reader, options.max_entry_name_length);
-        let mime: EntryMime = EntryMime::from(reader.read_i32::<LittleEndian>()?);
-        let original_size = reader.read_i32::<LittleEndian>()?;
-        let deprecated_offset = reader.read_i32::<LittleEndian>()? as i64;
-        let timestamp = reader.read_i32::<LittleEndian>()?;
-        let packed_size = reader.read_i32::<LittleEndian>()?;
+pub fn skim_bank(bank_name: &str, reader: &mut impl SeekAndRead, options: BankSkimOptions) -> Result<(SkimmedBank, SkimmedBankOffsets), BankDebinarizationError> {
+    let mut properties: HashMap<String, String> = HashMap::new();
+    let header_start = reader.stream_position().unwrap();
+    debug!("Starting to read bank file at position {}", header_start);
+    let (entries, calculated_buffer_end, header_end, header_length) = {
+        let mut version_found: bool = false;
+        let mut entries: Vec<EntryInfo> = vec![];
+        let mut buffer_end: i64 = header_start as i64;
 
-        let entry = EntryInfo {
-            filename,
-            mime,
-            original_size,
-            deprecated_offset,
-            timestamp,
-            packed_size,
+        //Read First Entry
+        {
+            let first_entry = EntryInfo::read_entry_meta(reader, &options)?;
+            if let EntryMime::Version = first_entry.mime {
+                debug!("First entry was version. ");
+
+                if options.require_version_blanked && !first_entry.is_blank() {
+                    return Err(BankDebinarizationError::VersionNotBlanked);
+                }
+                version_found = true;
+                read_properties(reader, &mut properties, &options)
+            } else if options.require_version_first {
+                return Err(BankDebinarizationError::FirstNotVersion);
+            } else {
+                entries.push(first_entry)
+            }
+        }
+
+        //Read Remaining Meta
+        {
+            while entries.len() < options.max_entry_count {
+                let mut current_entry = EntryInfo::read_entry_meta(reader, &options)?;
+                if current_entry.is_fully_blank() { break; }
+                if current_entry.mime == EntryMime::Version {
+                    //Options & Errors: What If Version Entry Is Not Zeroed Out?
+                    if !version_found {
+                        version_found = true;
+                        read_properties(reader, &mut properties, &options);
+                    }
+
+                    if let MultipleVersionStrategy::Allow {
+                        should_read_props
+                    } = options.multiple_version_strategy {
+                        if should_read_props {
+                            read_properties(reader, &mut properties, &options)
+                        }
+                    } else { return Err(BankDebinarizationError::VersionNotFound); }
+                    current_entry.filename = BankFsImpl::normalize_path(&*current_entry.filename, false);
+                    continue;
+                }
+
+                if options.remove_empty_entries && current_entry.packed_size == 0 {
+                    continue;
+                }
+
+                if let OffsetLocationStrategy::Calculate = options.offset_location_strategy {
+                    current_entry.deprecated_offset = buffer_end;
+                }
+
+                buffer_end += current_entry.packed_size as i64;
+                entries.push(current_entry.clone())
+            }
+        }
+
+        let header_end = reader.stream_position().unwrap();
+        let header_length =  header_end - header_start;
+        assert!(header_length > 0);
+
+        {
+            let mut i = 0;
+            while i != entries.len() {
+                let entry = &mut entries[i];
+                if let OffsetLocationStrategy::Calculate = options.offset_location_strategy {
+                    entry.deprecated_offset += header_length as i64;
+                }
+
+                if options.allow_offsets_to_header != ErrorStrategy::Allow && !is_entry_offset_valid(&entry, header_end) {
+                    if options.allow_offsets_to_header == ErrorStrategy::Deny {
+                        return Err(BankDebinarizationError::ImpossibleDataOffset)
+                    }
+                    entries.remove(i);
+                    continue;
+                }
+
+                i += 1;
+            }
+        }
+
+        (entries, buffer_end, header_end, header_length)
+    };
+    debug!("Finished reading header and calculating offsets. Found {} entry(s); Ended at {}.", entries.len(), header_end);
+    debug!("Assuming offsets were calculated correctly and not altered, the bank buffer should end at {} followed by a checksum", calculated_buffer_end);
+
+    Ok((
+        SkimmedBank {
+            bank_name: String::from(bank_name),
+            entries,
+            properties
+        },
+        SkimmedBankOffsets {
+            bank_start: header_start,
+            buffer_start: header_end,
+            last_calculated_offset: calculated_buffer_end,
+            header_length,
+        }
+    ))
+}
+
+#[inline]
+fn read_entry_meta(reader: &mut impl Read, options: &BankSkimOptions) -> Result<EntryInfo, Box<dyn Error>> {
+    let filename = read_utf8z(reader, options.max_entry_name_length);
+    let mime: EntryMime = EntryMime::from(reader.read_i32::<LittleEndian>()?);
+    let original_size = reader.read_i32::<LittleEndian>()?;
+    let deprecated_offset = reader.read_i32::<LittleEndian>()? as i64;
+    let timestamp = reader.read_i32::<LittleEndian>()?;
+    let packed_size = reader.read_i32::<LittleEndian>()?;
+
+    let entry = EntryInfo {
+        filename,
+        mime,
+        original_size,
+        deprecated_offset,
+        timestamp,
+        packed_size,
+    };
+
+    Ok(entry)
+}
+
+#[inline]
+fn read_properties(reader: &mut impl SeekAndRead, properties: &mut HashMap<String, String>, options: &BankSkimOptions) {
+    debug!("Starting to read properties at {}.", reader.stream_position().unwrap());
+    loop {
+        let name = read_utf8z(reader, options.max_property_length[0]);
+        if name.is_empty() {
+            debug!("Finishing properties reading at {}.", reader.stream_position().unwrap());
+            return;
+        }
+        let value = {
+            let mut value = read_utf8z(reader, options.max_property_length[1]);
+            if name == PROPERTY_PREFIX {
+                value = BankFsImpl::normalize_path(&*value, true)
+            }
+
+            value
         };
-
-        Ok(entry)
+        properties.insert(name, value);
     }
+}
+
+#[inline]
+fn is_entry_offset_valid(entry: &EntryInfo, header_end: u64) -> bool {
+    !(entry.deprecated_offset < 0 || entry.packed_size < 0 || entry.deprecated_offset as u64 >= header_end)
+}
+
+#[inline]
+fn read_utf8z(reader: &mut impl Read, cool_down: usize) -> String{
+    let mut bytes = Vec::new();
+    while bytes.len() < cool_down {
+        let mut byte = [0; 1];
+        reader.read_exact(&mut byte).unwrap();
+        if byte[0] == 0 {
+            break;
+        }
+        bytes.push(byte[0]);
+    }
+    String::from_utf8(bytes).unwrap()
+}
+
+impl EntryInfo {
     #[inline]
     fn is_blank(&self) -> bool {
         self.filename.is_empty() &&
@@ -105,113 +277,10 @@ impl EntryInfo {
 }
 
 impl BankFsImpl {
-    pub fn debinarize(name: &str, reader: &mut impl SeekAndRead, options: BankReadOptions) -> Result<Self, BankDebinarizationError> {
-        let mut properties: HashMap<String, String> = HashMap::new();
-        let header_start = reader.stream_position().unwrap();
-        debug!("Starting to read bank file at position {}", header_start);
-        let (data_entries, calculated_buffer_end, header_end) = {
-            let mut version_found: bool = false;
-            let mut entries: Vec<EntryInfo> = vec![];
-            let mut buffer_end: i64 = header_start as i64;
-
-            //Read First Entry
-            {
-                let first_entry = EntryInfo::read_entry_meta(reader, &options)?;
-                if let EntryMime::Version = first_entry.mime {
-                    debug!("First entry was version. ");
-
-                    if options.require_version_blanked && !first_entry.is_blank() {
-                        return Err(BankDebinarizationError::VersionNotBlanked);
-                    }
-                    version_found = true;
-                    read_properties(reader, &mut properties, &options)
-                } else if options.require_version_first {
-                    return Err(BankDebinarizationError::FirstNotVersion);
-                } else {
-                    entries.push(first_entry)
-                }
-            }
-
-            //Read Remaining Meta
-            {
-                while entries.len() < options.max_entry_count {
-                    let mut current_entry = EntryInfo::read_entry_meta(reader, &options)?;
-                    if current_entry.is_fully_blank() { break; }
-                    if current_entry.mime == EntryMime::Version {
-                        //Options & Errors: What If Version Entry Is Not Zeroed Out?
-                        if !version_found {
-                            version_found = true;
-                            read_properties(reader, &mut properties, &options);
-                        }
-
-                        if let MultipleVersionStrategy::Allow {
-                            should_read_props
-                        } = options.multiple_version_strategy {
-                            if should_read_props {
-                                read_properties(reader, &mut properties, &options)
-                            }
-                        } else { return Err(BankDebinarizationError::VersionNotFound); }
-                        current_entry.filename = BankFsImpl::normalize_path(&*current_entry.filename, false);
-                        continue;
-                    }
-
-                    if options.remove_empty_entries && current_entry.packed_size == 0 {
-                        continue;
-                    }
-
-                    if let OffsetLocationStrategy::Calculate = options.offset_location_strategy {
-                        current_entry.deprecated_offset = buffer_end;
-                    }
-
-                    buffer_end += current_entry.packed_size as i64;
-                    entries.push(current_entry.clone())
-                }
-            }
-
-            let header_end = reader.stream_position().unwrap();
-            let header_length =  header_end - header_start;
-            assert!(header_length > 0);
-
-            {
-                let mut i = 0;
-                while i != entries.len() {
-                    let entry = &mut entries[i];
-                    if let OffsetLocationStrategy::Calculate = options.offset_location_strategy {
-                        entry.deprecated_offset += header_length as i64;
-                    }
-
-                    if options.allow_offsets_to_header != ErrorStrategy::Allow && !is_entry_offset_valid(&entry, header_end) {
-                        if options.allow_offsets_to_header == ErrorStrategy::Deny {
-                            return Err(BankDebinarizationError::ImpossibleDataOffset)
-                        }
-                        entries.remove(i);
-                        continue;
-                    }
-
-                    i += 1;
-                }
-            }
-
-            (entries, buffer_end, header_end)
-        };
-        debug!("Finished reading header and calculating offsets. Found {} entry(s); Ended at {}.", data_entries.len(), header_end);
-        debug!("Assuming offsets were calculated correctly and not altered, the bank buffer should end at {} followed by a checksum", calculated_buffer_end);
-        let filesystem = {
-            let mut fs = Self {
-                name: String::from(name),
-                properties,
-                files: Default::default(),
-            };
-
-            fs
-        };
-
-        Ok(filesystem)
-    }
-}
-
-fn is_entry_offset_valid(entry: &EntryInfo, header_end: u64) -> bool {
-    !(entry.deprecated_offset < 0 || entry.packed_size < 0 || entry.deprecated_offset as u64 >= header_end)
+    // pub fn debinarize(name: &str, reader: &mut impl SeekAndRead, options: BankSkimOptions) -> Result<Self, BankDebinarizationError> {
+    //
+    //     todo!()
+    // }
 }
 
 impl From<i32> for EntryMime {
@@ -226,13 +295,11 @@ impl From<i32> for EntryMime {
     }
 }
 
-
 impl Default for MultipleVersionStrategy {
     fn default() -> Self {
         Self::Forbid
     }
 }
-
 
 impl Default for OffsetLocationStrategy {
     fn default() -> Self {
@@ -240,7 +307,7 @@ impl Default for OffsetLocationStrategy {
     }
 }
 
-impl Default for BankReadOptions {
+impl Default for BankSkimOptions {
     fn default() -> Self {
         Self {
             require_version_first: true,
@@ -260,57 +327,6 @@ impl Default for BankReadOptions {
     }
 }
 
-
-
-fn read_properties(reader: &mut impl SeekAndRead, properties: &mut HashMap<String, String>, options: &BankReadOptions ) {
-    debug!("Starting to read properties at {}.", reader.stream_position().unwrap());
-    loop {
-        let name = read_utf8z(reader, options.max_property_length[0]);
-        if name.is_empty() {
-            debug!("Finishing properties reading at {}.", reader.stream_position().unwrap());
-            return;
-        }
-        let value = {
-            let mut value = read_utf8z(reader, options.max_property_length[1]);
-            if name == PROPERTY_PREFIX {
-                value = BankFsImpl::normalize_path(&*value, true)
-            }
-
-            value
-        };
-        properties.insert(name, value);
-    }
-
-
-}
-
-fn read_utf8z(reader: &mut impl Read, cool_down: usize) -> String{
-    let mut bytes = Vec::new();
-    while bytes.len() < cool_down {
-        let mut byte = [0; 1];
-        reader.read_exact(&mut byte).unwrap();
-        if byte[0] == 0 {
-            break;
-        }
-        bytes.push(byte[0]);
-    }
-    String::from_utf8(bytes).unwrap()
-}
-
-#[derive(Debug)]
-pub enum BankDebinarizationError {
-    StringTooLong,
-    FirstNotVersion,
-    VersionNotFound,
-    MultipleVersionsFound,
-    ImpossibleDataOffset,
-    DecompressionError,
-    VersionNotBlanked,
-    DecryptionError,
-    InvalidChecksum,
-    Obfuscated,
-    Other(String)
-}
 impl From<Box<dyn Error>> for BankDebinarizationError {
     fn from(err: Box<dyn Error>) -> BankDebinarizationError {
         BankDebinarizationError::Other(format!("An error occurred: {}", err))
@@ -368,7 +384,7 @@ mod test {
         setup_logging();
         let file = File::open("C:\\Users\\ryann\\Desktop\\Testing\\offset_trap.pbo").expect("unable to open file");
         let mut reader = BufReader::new(file);
-        let bank_options = BankReadOptions::default();
+        let bank_options = BankSkimOptions::default();
         match BankFsImpl::debinarize("offset_trap", &mut reader, bank_options) {
             Ok(bank) => {}
             Err(error) => { error!("Error occurred: {}", error); }
