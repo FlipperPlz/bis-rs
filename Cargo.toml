@@ -9,6 +9,7 @@ edition = "2021"
 vfs = "0.9.0"
 log = "0.4.20"
 byteorder = "1.4.3"
+env_logger = { version = "0.10.0", features = [] }
 
 [lib]
 crate-type = ["cdylib"]
