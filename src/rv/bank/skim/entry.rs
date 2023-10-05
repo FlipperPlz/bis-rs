@@ -1,7 +1,5 @@
-use std::io::{Read};
 use crate::{magic_enum};
-use crate::read::{EntryMetadataError};
-
+use crate::EntryMetadataError;
 pub const ENTRY_NAME_MAX: u16 = 1023;
 
 #[derive(Clone, Debug)]

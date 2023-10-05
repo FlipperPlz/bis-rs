@@ -14,11 +14,11 @@ pub trait Debinarizable<R: ?Sized>: Sized + Clone {
         Ok(())
     }
 
-    fn debinarize_while(reader: &mut R, predicate: impl Fn(&Self) -> bool) -> Result<Vec<Self>, Self::Error> {
+    fn debinarize_while(reader: &mut R, mut predicate: impl FnMut(&Self) -> Result<bool, Self::Error>) -> Result<Vec<Self>, Self::Error> {
         let mut vec = Vec::new();
 
         while let Ok(item) = Self::debinarize(reader) {
-            if !predicate(&item) { break; }
+            if !predicate(&item)? { break; }  // Now the closure can return an error which will be propagated
 
             vec.push(item.clone());
         }
@@ -26,13 +26,13 @@ pub trait Debinarizable<R: ?Sized>: Sized + Clone {
         Ok(vec)
     }
 
-    fn debinarize_until(reader: &mut R, predicate: impl Fn(&Self) -> bool) -> Result<Vec<Self>, Self::Error> {
+    fn debinarize_until(reader: &mut R, mut predicate: impl FnMut(&Self) -> Result<bool, Self::Error>) -> Result<Vec<Self>, Self::Error> {
         let mut vec = Vec::new();
 
         while let Ok(item) = Self::debinarize(reader) {
             vec.push(item.clone());
 
-            if predicate(&item) { break; }
+            if predicate(&item)? { break; }
         }
 
         Ok(vec)
