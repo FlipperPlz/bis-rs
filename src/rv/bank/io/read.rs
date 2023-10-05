@@ -14,6 +14,7 @@ use crate::{
     OffsetLocationStrategy,
     path
 };
+
 #[derive(Clone)]
 struct PboFileSkim {
     pub(crate) buffer_start:  u64,
@@ -21,8 +22,6 @@ struct PboFileSkim {
     pub(crate) options:       BankSkimOptions,
     pub(crate) properties:    HashMap<String, String>
 }
-
-
 
 pub struct PboReader<R: Read + Seek> {
     reader: R,
@@ -32,48 +31,56 @@ impl<R: Read + Seek> PboReader<R> {
     #[inline]
     fn skim_archive(reader: &mut R, options: BankSkimOptions) -> Result<PboFileSkim, BankSkimError> {
         let (properties, entries) = Self::process_entries(reader, &options)?;
-        let buffer_start = reader.stream_position().unwrap();
+
 
         Ok(PboFileSkim {
             buffer_start,
-            entries: entries.into_iter().map(|e| {
-                let start = e.start_offset.clone() + buffer_start;
-                (e, start)
-            }).collect(),
+            entries,
             options,
             properties,
         })
     }
 
     #[inline]
-    fn process_entries(reader: &mut R, options: &BankSkimOptions) -> Result<(HashMap<String, String>, Vec<BankEntry>), BankSkimError> {
-        let mut e_offset: i32 = 0;
-        let mut last_was_version: bool = false;
+    fn process_entries(reader: &mut R, options: &BankSkimOptions) -> Result<(HashMap<String, String>, HashMap<BankEntry, u64>), BankSkimError> {
         let mut properties = HashMap::new();
-        let entries = BankEntry::debinarize_while(reader, |e, closure_reader| {
-            match options.offset_location_strategy {
-                OffsetLocationStrategy::Calculate => {
-                    e.start_offset = e_offset as u64;
-                    e_offset += e.size_packed as i32;
+        let entries: HashMap<BankEntry, u64>;
+        let end_of_bank: i32;
+        let buffer_start: u64;
+        {
+            let mut e_offset: i32 = 0;
+            let closure_entries = BankEntry::debinarize_while(reader, |e, closure_reader| {
+                match options.offset_location_strategy {
+                    OffsetLocationStrategy::Calculate => {
+                        e.start_offset = e_offset as u64;
+                        e_offset += e.size_packed as i32;
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-            return if e.start_offset <= 0 && options.remove_impossible_offsets {
-                Ok(DebinarizePredicateOption::Skip)
-            } else {
-                if empty_name(e) {
-                    return if is_version(e) {
-                        last_was_version = true;
-                        Self::read_properties(closure_reader, &mut properties)?;
-                        Ok(DebinarizePredicateOption::Ok)
-                    } else { Ok(DebinarizePredicateOption::Break) };
+                return if e.start_offset <= 0 && options.remove_impossible_offsets {
+                    Ok(DebinarizePredicateOption::Skip)
+                } else {
+                    if empty_name(e) {
+                        return if is_version(e) {
+                            Self::read_properties(closure_reader, &mut properties)?;
+                            Ok(DebinarizePredicateOption::Ok)
+                        } else {
+                            Ok(DebinarizePredicateOption::Break) };
+                    }
+                    e.filename = path::convert_dir_slash(&e.filename);
+                    Ok(DebinarizePredicateOption::Ok)
                 }
-                e.filename = path::convert_dir_slash(&e.filename);
-                Ok(DebinarizePredicateOption::Ok)
-            }
+            })?;
+            buffer_start = reader.stream_position().unwrap();
+            entries = closure_entries.into_iter().filter_map(|e| {
+                let start = e.start_offset.clone() + buffer_start;
 
-        })?;
-
+                if options.allow_offsets_to_header || start >= buffer_start {
+                    Some((e, start))
+                } else { None }
+            }).collect();
+            end_of_bank = e_offset;
+        }
         Ok((properties, entries))
     }
 
