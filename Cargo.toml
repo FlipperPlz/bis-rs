@@ -8,7 +8,9 @@ edition = "2021"
 [dependencies]
 vfs = "0.9.0"
 log = "0.4.20"
+thiserror = "1.0.49"
 byteorder = "1.4.3"
+async-std = "1.12.0"
 env_logger = { version = "0.10.0", features = [] }
 
 [lib]
