@@ -17,7 +17,6 @@ use crate::{
 
 #[derive(Clone)]
 struct PboFileSkim {
-    pub(crate) buffer_start:  u64,
     pub(crate) entries:       HashMap<BankEntry, u64>,
     pub(crate) options:       BankSkimOptions,
     pub(crate) properties:    HashMap<String, String>
@@ -34,7 +33,6 @@ impl<R: Read + Seek> PboReader<R> {
 
 
         Ok(PboFileSkim {
-            buffer_start,
             entries,
             options,
             properties,
