@@ -51,7 +51,8 @@ pub trait Debinarizable<R: ?Sized>: Sized + Clone {
 pub trait CustomDebinarizable<
     R: ?Sized,
     O: DebinarizationOptions
-> {
+>: Sized + Clone {
+    type Error;
 
     fn debinarize_with_options(reader: &mut R, options: O) -> Result<Self, Self::Error>;
 

@@ -2,7 +2,7 @@ use crate::{magic_enum};
 use crate::EntryMetadataError;
 pub const ENTRY_NAME_MAX: u16 = 1023;
 
-#[derive(Clone, Debug)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct BankEntry {
     pub(crate) filename:      String,
     pub(crate) mime:          EntyMime,

@@ -3,7 +3,6 @@ use std::io::{Read, Seek};
 use byteorder::{LittleEndian, ReadBytesExt};
 use crate::{
     BankEntry,
-    BankFile,
     BankSkimError,
     BankSkimOptions,
     CustomDebinarizable,
@@ -15,6 +14,13 @@ use crate::{
     OffsetLocationStrategy,
     path
 };
+#[derive(Clone)]
+struct PboFileSkim {
+    pub(crate) buffer_start:  u64,
+    pub(crate) entries:       HashMap<BankEntry, u64>,
+    pub(crate) options:       BankSkimOptions,
+    pub(crate) properties:    HashMap<String, String>
+}
 
 
 
@@ -24,21 +30,23 @@ pub struct PboReader<R: Read + Seek> {
 
 impl<R: Read + Seek> PboReader<R> {
     #[inline]
-    fn read_archive(reader: &mut R, options: BankSkimOptions) -> Result<BankFile, BankSkimError> {
-        let header_start = reader.stream_position().unwrap();
-        let (properties, entries) = Self::process_entries(reader, options)?;
+    fn skim_archive(reader: &mut R, options: BankSkimOptions) -> Result<PboFileSkim, BankSkimError> {
+        let (properties, entries) = Self::process_entries(reader, &options)?;
         let buffer_start = reader.stream_position().unwrap();
 
-        Ok(BankFile {
-            header_start,
+        Ok(PboFileSkim {
             buffer_start,
-            entries,
+            entries: entries.into_iter().map(|e| {
+                let start = e.start_offset.clone() + buffer_start;
+                (e, start)
+            }).collect(),
+            options,
             properties,
         })
     }
 
     #[inline]
-    fn process_entries(reader: &mut R, options: BankSkimOptions) -> Result<(HashMap<String, String>, Vec<BankEntry>), BankSkimError> {
+    fn process_entries(reader: &mut R, options: &BankSkimOptions) -> Result<(HashMap<String, String>, Vec<BankEntry>), BankSkimError> {
         let mut e_offset: i32 = 0;
         let mut last_was_version: bool = false;
         let mut properties = HashMap::new();
@@ -47,23 +55,23 @@ impl<R: Read + Seek> PboReader<R> {
                 OffsetLocationStrategy::Calculate => {
                     e.start_offset = e_offset as u64;
                     e_offset += e.size_packed as i32;
-
-                    if e.start_offset <= 0 && options.remove_impossible_offsets {
-                        return Ok(DebinarizePredicateOption::Skip)
-                    }
                 }
                 _ => {}
             }
-
-            if empty_name(e) {
-                return if is_version(e) {
-                    last_was_version = true;
-                    Self::read_properties(closure_reader, &mut properties)?;
-                    Ok(DebinarizePredicateOption::Ok)
-                } else { Ok(DebinarizePredicateOption::Break) };
+            return if e.start_offset <= 0 && options.remove_impossible_offsets {
+                Ok(DebinarizePredicateOption::Skip)
+            } else {
+                if empty_name(e) {
+                    return if is_version(e) {
+                        last_was_version = true;
+                        Self::read_properties(closure_reader, &mut properties)?;
+                        Ok(DebinarizePredicateOption::Ok)
+                    } else { Ok(DebinarizePredicateOption::Break) };
+                }
+                e.filename = path::convert_dir_slash(&e.filename);
+                Ok(DebinarizePredicateOption::Ok)
             }
-            e.filename = path::convert_dir_slash(&e.filename);
-            Ok(DebinarizePredicateOption::Ok)
+
         })?;
 
         Ok((properties, entries))
@@ -140,9 +148,11 @@ impl<R: Read + Seek> Debinarizable<R> for BankEntry {
     }
 }
 
-impl<R: Read + Seek> CustomDebinarizable<R, BankSkimOptions> for BankFile {
+impl<R: Read + Seek> CustomDebinarizable<R, BankSkimOptions> for PboFileSkim {
+    type Error = BankSkimError;
+
     fn debinarize_with_options(reader: &mut R, options: BankSkimOptions) -> Result<Self, Self::Error> {
-        PboReader::read_archive(reader, options)
+        PboReader::skim_archive(reader, options)
     }
 }
 

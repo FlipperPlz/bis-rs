@@ -16,7 +16,7 @@ macro_rules! magic_enum {
         $($variant: ident = $value:expr),* $(,)?
     }) => {
         #[repr($typ)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
         pub enum $name {
             $($variant = $value),*
         }
