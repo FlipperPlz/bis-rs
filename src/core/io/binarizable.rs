@@ -2,6 +2,12 @@ pub trait DebinarizationOptions : Default {
 
 }
 
+pub enum DebinarizePredicateOption {
+    Ok,
+    Skip,
+    Break,
+}
+
 pub trait Debinarizable<R: ?Sized>: Sized + Clone {
     type Error;
 
@@ -14,13 +20,15 @@ pub trait Debinarizable<R: ?Sized>: Sized + Clone {
         Ok(())
     }
 
-    fn debinarize_while(reader: &mut R, mut predicate: impl FnMut(&Self) -> Result<bool, Self::Error>) -> Result<Vec<Self>, Self::Error> {
+    fn debinarize_while(reader: &mut R, mut predicate: impl FnMut(&mut Self, &mut R) -> Result<DebinarizePredicateOption, Self::Error>) -> Result<Vec<Self>, Self::Error> {
         let mut vec = Vec::new();
 
-        while let Ok(item) = Self::debinarize(reader) {
-            if !predicate(&item)? { break; }  // Now the closure can return an error which will be propagated
-
-            vec.push(item.clone());
+        while let Ok(mut item) = Self::debinarize(reader) {
+            match predicate(&mut item, reader)? {
+                DebinarizePredicateOption::Skip => { continue }
+                DebinarizePredicateOption::Break => { break }
+                _ => {vec.push(item.clone())}
+            }
         }
 
         Ok(vec)
@@ -43,10 +51,13 @@ pub trait Debinarizable<R: ?Sized>: Sized + Clone {
 pub trait CustomDebinarizable<
     R: ?Sized,
     O: DebinarizationOptions
->: Debinarizable<R> {
+> {
+
     fn debinarize_with_options(reader: &mut R, options: O) -> Result<Self, Self::Error>;
 
     fn debinarize(reader: &mut R) -> Result<Self, Self::Error> {
         Self::debinarize_with_options(reader, O::default())
     }
+
+
 }
