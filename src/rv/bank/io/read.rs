@@ -1,29 +1,35 @@
 use std::collections::HashMap;
-use std::io::{IoSliceMut, Read, Seek, SeekFrom};
+use std::io;
+use std::io::{Read, Seek};
 use byteorder::{LittleEndian, ReadBytesExt};
 use crate::{BankSkimError, CustomDebinarizable, Debinarizable, DebinarizePredicateOption, encryption, EncryptionType, EntryMetadataError, EntryNameError, MAX_PATH_LENGTH, path};
 use crate::entry::{BankEntry, EntyMime};
 use crate::options::{BankSkimOptions, OffsetLocationStrategy};
 
 #[derive(Clone)]
-pub struct PboFileSkim {
+pub struct PboFileSkim<R: Read> {
+    reader:                   PboReader<R>,
     pub(crate) entries:       HashMap<BankEntry, u64>,
     pub(crate) options:       BankSkimOptions,
     pub(crate) properties:    HashMap<String, String>
 }
 
+#[derive(Clone)]
 pub struct PboReader<R: Read> {
-    reader: R,
+    reader:   R,
+    position: u64
 }
 
+impl<R: Read> PboReader<R> {
 
-impl<R: Read + Seek> PboReader<R> {
     #[inline]
-    fn skim_archive(&mut self, options: BankSkimOptions) -> Result<PboFileSkim, BankSkimError> {
-        let (properties, entries) = self.process_entries(&options)?;
+    pub fn skim_archive(reader: R, options: BankSkimOptions) -> Result<PboFileSkim<R>, BankSkimError> {
+        let mut reader = PboReader { reader, position: 0 };
+        let (properties, entries) = reader.process_entries(&options)?;
 
 
-        Ok(PboFileSkim {
+        Ok(PboFileSkim::<R> {
+            reader,
             entries,
             options,
             properties,
@@ -79,7 +85,7 @@ impl<R: Read + Seek> PboReader<R> {
                     Ok(DebinarizePredicateOption::Ok)
                 }
             })?;
-            buffer_start = self.reader.stream_position().unwrap();
+            buffer_start = self.position;
             entries = closure_entries.into_iter().filter_map(|e| {
                 let start = e.start_offset.clone() + buffer_start;
 
@@ -98,24 +104,31 @@ impl<R: Read + Seek> PboReader<R> {
         return Ok((is_version(&entry), entry))
     }
 
-
     #[inline]
     fn read_entry(&mut self) -> Result<BankEntry, EntryMetadataError> {
         return Ok(
             BankEntry {
                 filename: self.read_entry_name()?,
                 mime: self.read_mime()?,
-                size_unpacked: self.read_i32::<LittleEndian>()? as u32,
-                start_offset: self.read_i32::<LittleEndian>()? as u64,
-                timestamp: self.read_i32::<LittleEndian>()? as u32,
-                size_packed: self.read_i32::<LittleEndian>()? as u32,
+                size_unpacked: self.read_int()? as u32,
+                start_offset: self.read_int()? as u64,
+                timestamp: self.read_int()? as u32,
+                size_packed: self.read_int()? as u32,
             }
         )
     }
 
+
+    #[inline]
+    fn read_int(&mut self) -> Result<i32, io::Error> {
+        let val = self.reader.read_i32::<LittleEndian>()?;
+        self.position += 4;
+        Ok(val)
+    }
+
     #[inline]
     fn read_mime(&mut self) -> Result<EntyMime, EntryMetadataError> {
-        return EntyMime::try_from(self.reader.read_i32::<LittleEndian>()?)
+        EntyMime::try_from(self.read_int()?)
     }
 
     #[inline]
@@ -123,6 +136,7 @@ impl<R: Read + Seek> PboReader<R> {
         let mut vec = Vec::new();
 
         for _ in 0..MAX_PATH_LENGTH {
+            self.position += 1;
             match self.reader.read_u8()? as i32 {
                 0 => break,
                 i if i < 0 => {
@@ -155,19 +169,11 @@ impl<R: Read + Seek> Debinarizable<PboReader<R>> for EntyMime {
     }
 }
 
-impl<R: Read + Seek> Debinarizable<PboReader<R>> for BankEntry {
+impl<R: Read> Debinarizable<PboReader<R>> for BankEntry {
     type Error = EntryMetadataError;
 
     fn debinarize(reader: &mut PboReader<R>) -> Result<Self, Self::Error> {
         reader.read_entry()
-    }
-}
-
-impl<R: Read + Seek> CustomDebinarizable<PboReader<R>, BankSkimOptions> for PboFileSkim {
-    type Error = BankSkimError;
-
-    fn debinarize_with_options(reader: &mut PboReader<R>, options: BankSkimOptions) -> Result<Self, Self::Error> {
-        reader.skim_archive(options)
     }
 }
 
@@ -179,43 +185,4 @@ fn is_version(entry: &BankEntry) -> bool {
 #[inline]
 fn empty_name(entry: &BankEntry) -> bool {
     entry.filename.is_empty()
-}
-
-impl<R: Read + Seek> Seek for PboReader<R> {
-    #[inline]
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        self.reader.seek(pos)
-    }
-
-    #[inline]
-    fn rewind(&mut self) -> std::io::Result<()> {
-        self.reader.rewind()
-    }
-
-    #[inline]
-    fn stream_position(&mut self) -> std::io::Result<u64> {
-        self.reader.stream_position()
-    }
-
-}
-impl<R: Read> Read for PboReader<R> {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.reader.read(buf)
-    }
-
-    #[inline]
-    fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> std::io::Result<usize> {
-        self.reader.read_vectored(bufs)
-    }
-
-    #[inline]
-    fn read_to_string(&mut self, buf: &mut String) -> std::io::Result<usize> {
-        self.reader.read_to_string(buf)
-    }
-
-    #[inline]
-    fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
-        self.reader.read_exact(buf)
-    }
 }

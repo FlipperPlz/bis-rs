@@ -1,28 +1,20 @@
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::io::Write;
+use std::fmt::{Debug};
+use std::io::{Write};
+use io_streams::StreamDuplexer;
 use vfs::{FileSystem, SeekAndRead, VfsMetadata, VfsResult};
-
+use crate::PboFileSkim;
 
 
 #[derive(Debug)]
 struct BankFilesystem {
-    entries:      HashMap<String, BankFsEntry>,
-    prefix:       String
+    banks:    HashMap<String, PboFileSkim<StreamDuplexer>>
 }
 
-#[derive(Debug)]
-enum BankFsEntry {
-    Directory {
-
-    },
-    File {
-
-    }
-}
 
 
 impl FileSystem for BankFilesystem {
+
     fn read_dir(&self, path: &str) -> VfsResult<Box<dyn Iterator<Item=String> + Send>> {
         todo!()
     }
