@@ -1,6 +1,5 @@
 use crate::{magic_enum};
 use crate::EntryMetadataError;
-pub const ENTRY_NAME_MAX: u16 = 1023;
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct BankEntry {
@@ -8,8 +7,8 @@ pub struct BankEntry {
     pub(crate) mime:          EntyMime,
     pub(crate) size_unpacked: u32,
     pub(crate) start_offset:  u64,
-    pub(crate) timestamp:     u64,
-    pub(crate) size_packed:   u64,
+    pub(crate) timestamp:     u32,
+    pub(crate) size_packed:   u32,
 }
 
 magic_enum! {

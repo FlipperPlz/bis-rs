@@ -1,5 +1,7 @@
 const WIN_DIR: char = '\\';
 const UNIX_DIR: char = '/';
+pub const BANK_DIR: char = UNIX_DIR;
+pub const MAX_PATH_LENGTH: u16 = 1023;
 
 #[inline]
 pub fn normalize_path(path: &str, directory: bool) -> String {

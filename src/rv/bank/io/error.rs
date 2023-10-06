@@ -31,11 +31,22 @@ pub enum EntryMetadataError {
     EntryNameError(
         #[from] EntryNameError
     ),
+    #[error("Invalid Encryption")]
+    EncryptionError(
+        #[from] BankEncryptionError
+    ),
     #[error(transparent)]
     IO(
         #[from] io::Error
     )
 }
+
+#[derive(Debug, Error)]
+pub enum BankEncryptionError {
+    #[error("The encryption format of this pbo is not supported")]
+    NotSupported
+}
+
 #[derive(Debug, Error)]
 pub enum EntryNameError {
     #[error("An entry was found with a weird name. I dont know how to handle this yet or if its possible.")]
