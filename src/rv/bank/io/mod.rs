@@ -14,7 +14,7 @@ pub const HEADER_PREFIX_MAGIC: &str = "prefix";
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub struct BankEntry {
     pub(crate) filename:      String,
-    pub(crate) mime:          EntyMime,
+    pub(crate) mime: EntryMime,
     pub(crate) size_unpacked: u32,
     pub(crate) start_offset:  u64,
     pub(crate) timestamp:     u32,
@@ -23,7 +23,7 @@ pub struct BankEntry {
 
 magic_enum! {
     i32,
-    EntyMime,
+    EntryMime,
     EntryMetadataError,
     EntryMimeNotSupported {
         Decompressed = 0x00000000,
@@ -156,8 +156,8 @@ impl<R: Read> PboReader<R> {
     }
 
     #[inline]
-    fn read_mime(&mut self) -> Result<EntyMime, EntryMetadataError> {
-        EntyMime::try_from(self.read_int()?)
+    fn read_mime(&mut self) -> Result<EntryMime, EntryMetadataError> {
+        EntryMime::try_from(self.read_int()?)
     }
 
     #[inline]
@@ -196,7 +196,7 @@ impl<R: Read> PboReader<R> {
     }
 }
 
-impl<R: Read + Seek> Debinarizable<PboReader<R>> for EntyMime {
+impl<R: Read + Seek> Debinarizable<PboReader<R>> for EntryMime {
     type Error = EntryMetadataError;
 
     fn debinarize(reader: &mut PboReader<R>) -> Result<Self, Self::Error> {
@@ -214,7 +214,7 @@ impl<R: Read> Debinarizable<PboReader<R>> for BankEntry {
 
 #[inline]
 fn is_version(entry: &BankEntry) -> bool {
-    entry.mime == EntyMime::Version && entry.size_packed == 0 && entry.timestamp == 0
+    entry.mime == EntryMime::Version && entry.size_packed == 0 && entry.timestamp == 0
 }
 
 #[inline]

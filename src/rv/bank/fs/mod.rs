@@ -8,31 +8,52 @@ use std::io::{Write};
 use std::path::Path;
 use async_std::io as aio;
 use vfs::{FileSystem, SeekAndRead};
-use crate::{BankEntry, HEADER_PREFIX_MAGIC, PboFileSkim, PboReader};
+use crate::{EntryMime, HEADER_PREFIX_MAGIC, PboFileSkim, PboReader};
 use crate::fs::error::BankLoadError;
 use crate::options::BankSkimOptions;
 
 
 #[derive(Debug)]
 struct BankFilesystem {
-    banks:    Vec<(BankFileMeta, PboFileSkim<File>)>,
+    banks:    Vec<BankFileMeta>,
 }
 
 #[derive(Debug)]
 struct BankFileMeta {
+    skim:              PboFileSkim<File>,
     prefix:            String,
-    rewritten_entries: HashMap<String, CachedEntry>,
-    deleted_entries:   HashMap<String, String>,
-    renamed_entries:   HashMap<String, String>,
+    changed_prefix:    Option<String>,
+    open_entries:      HashMap<CachedEntry, aio::Cursor<Vec<u8>>>,
+    deleted_entries:   Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct CachedEntry {
-    meta: BankEntry,
-    data: Box<aio::Cursor<Vec<u8>>>
+    data_altered:  bool,
+    name:          String,
+    timestamp:     CachedTimestamp,
+    offset:        Option<u32>,
+    size:          Option<u32>,
+    packed_size:   Option<u32>,
+    mime:          Option<EntryMime>,
+}
+
+#[derive(Debug, Hash)]
+enum CachedTimestamp {
+    Generate,
+    Custom(u32)
 }
 
 impl BankFilesystem {
+    pub fn bank_for_prefix(&self, prefix: &str) -> Option<&BankFileMeta> {
+        self.banks.iter().find(|&meta| {
+            match &meta.changed_prefix {
+                None => meta.prefix.eq_ignore_ascii_case(prefix),
+                Some(it) => it.eq_ignore_ascii_case(prefix)
+            }
+        })
+    }
+
     pub fn load_bank(&mut self, path: &Path, options: BankSkimOptions) -> Result<(), BankLoadError> {
         let file = File::open(path)?;
         let archive = PboReader::skim_archive(file, options)?;
@@ -46,23 +67,27 @@ impl BankFilesystem {
             Some(it) => Ok(it.clone())
         }?;
 
-        self.banks.push((BankFileMeta::new(prefix), archive));
+        self.banks.push(BankFileMeta::new(prefix, archive));
         Ok(())
     }
 
-    pub fn open_bank(&self, path: &str) {
-        todo!()
-    }
 }
 
 impl BankFileMeta {
-    fn new(prefix: String) -> Self {
+    fn new(prefix: String, skim: PboFileSkim<File>) -> Self {
         Self {
+            skim,
             prefix,
-            rewritten_entries: HashMap::new(),
-            deleted_entries: HashMap::new(),
-            renamed_entries: HashMap::new(),
+            changed_prefix: None,
+            open_entries: HashMap::new(),
+            deleted_entries: vec![],
         }
+    }
+
+    fn unchanged(&self) -> bool {
+        self.changed_prefix.is_none() &&
+            self.open_entries.iter().all(|(entry, _)| !entry.data_altered) &&
+            self.deleted_entries.is_empty()
     }
 }
 
