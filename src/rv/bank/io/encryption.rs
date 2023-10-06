@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::{Read};
-use byteorder::{LittleEndian, ReadBytesExt};
 use crate::{EntryMetadataError, PboReader};
 
 const HEADER_ENCRYPTION_MAGIC: &str = "hprotect";
@@ -19,7 +18,7 @@ pub enum EncryptionType {
     None
 }
 
-pub fn get_encryption_mode<R: Read> (reader: &mut PboReader<R>, properties: &HashMap<String, String>) -> Result<EncryptionType, EntryMetadataError> {
+pub fn get_encryption_mode<R: Read>(reader: &mut PboReader<R>, properties: &HashMap<String, String>) -> Result<EncryptionType, EntryMetadataError> {
 
     // match properties.get(HEADER_ENCRYPTION_MAGIC) {
     //     None => {}
