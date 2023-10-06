@@ -6,7 +6,7 @@ use crate::{BankSkimError, CustomDebinarizable, Debinarizable, DebinarizePredica
 use crate::entry::{BankEntry, EntyMime};
 use crate::options::{BankSkimOptions, OffsetLocationStrategy};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PboFileSkim<R: Read> {
     reader:                   PboReader<R>,
     pub(crate) entries:       HashMap<BankEntry, u64>,
@@ -14,7 +14,7 @@ pub struct PboFileSkim<R: Read> {
     pub(crate) properties:    HashMap<String, String>
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PboReader<R: Read> {
     reader:   R,
     position: u64

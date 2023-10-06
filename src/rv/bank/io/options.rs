@@ -1,12 +1,12 @@
 use crate::DebinarizationOptions;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum OffsetLocationStrategy {
     Deprecated,
     Calculate
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BankSkimOptions {
     pub(crate) offset_location_strategy:   OffsetLocationStrategy,
     pub(crate) allow_offsets_to_header:    bool,
