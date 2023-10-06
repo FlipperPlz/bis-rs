@@ -184,15 +184,12 @@ impl<R: Read> PboReader<R> {
             let name = self.read_entry_name()?;
 
             if name.is_empty() { break }
-            let value = match name {
-                HEADER_PREFIX_MAGIC => {
-                    let mut it = self.read_entry_name()?;
-                    it.push(BANK_DIR);
-                    it
-                    //TODO: Better normalization
-                }
-                _ => {self.read_entry_name()?}
-            };
+
+            let value =if name.eq(HEADER_PREFIX_MAGIC) {
+                let mut it = self.read_entry_name()?;
+                it.push(BANK_DIR);
+                it
+            } else { self.read_entry_name()? };
             properties.insert(name, value);
         }
         Ok(())
