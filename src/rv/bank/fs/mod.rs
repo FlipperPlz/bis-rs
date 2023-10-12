@@ -4,11 +4,9 @@ use std::collections::HashMap;
 use std::fmt::{Debug};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::io::{Write};
 use std::path::Path;
 use async_std::io as aio;
-use vfs::{FileSystem, SeekAndRead};
-use crate::{EntryMime, HEADER_PREFIX_MAGIC, PboFileSkim, PboReader};
+use crate::{BankSkimEntry, EntryMime, HEADER_PREFIX_MAGIC, PboFileSkim, PboReader};
 use crate::fs::error::BankLoadError;
 use crate::options::BankSkimOptions;
 
@@ -29,9 +27,11 @@ struct BankFileMeta {
 
 #[derive(Debug, Hash)]
 struct CachedEntry {
+    cached_from:   Option<Box<BankSkimEntry>>,
     data_altered:  bool,
     name:          String,
-    timestamp:     CachedTimestamp,
+    changed_name:  Option<String>,
+    timestamp:     Option<CachedTimestamp>,
     offset:        Option<u32>,
     size:          Option<u32>,
     packed_size:   Option<u32>,
@@ -42,6 +42,22 @@ struct CachedEntry {
 enum CachedTimestamp {
     Generate,
     Custom(u32)
+}
+
+impl BankFileMeta {
+    pub fn locate_file(&self, name: &str) -> Option<&CachedEntry> {
+        self.open_entries.iter()
+            .find(|(&ref entry, _)| entry.name.eq_ignore_ascii_case(name))
+            .map(|(entry, _)| entry)
+        // Look in skim if not found
+    }
+
+    // pub fn load_file(&self, skim_entry: &BankSkimEntry) -> {
+    //     match self.skim.entries.get(skim_entry) {
+    //         None => {}
+    //         Some(&offset) => {}
+    //     }
+    // }
 }
 
 impl BankFilesystem {
@@ -86,8 +102,20 @@ impl BankFileMeta {
 
     fn unchanged(&self) -> bool {
         self.changed_prefix.is_none() &&
-            self.open_entries.iter().all(|(entry, _)| !entry.data_altered) &&
+            self.open_entries.iter().all(|(entry, _)| entry.unchanged()) &&
             self.deleted_entries.is_empty()
+    }
+}
+
+impl CachedEntry {
+    fn unchanged(&self) -> bool {
+        !self.data_altered &&
+            self.timestamp.is_none() &&
+            self.changed_name.is_none() &&
+            self.packed_size.is_none() &&
+            self.size.is_none() &&
+            self.mime.is_none() &&
+            self.offset.is_none()
     }
 }
 

@@ -12,7 +12,7 @@ use crate::options::{BankSkimOptions, OffsetLocationStrategy};
 pub const HEADER_PREFIX_MAGIC: &str = "prefix";
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
-pub struct BankEntry {
+pub struct BankSkimEntry {
     pub(crate) filename:      String,
     pub(crate) mime: EntryMime,
     pub(crate) size_unpacked: u32,
@@ -35,22 +35,33 @@ magic_enum! {
 
 
 #[derive(Clone, Debug)]
-pub struct PboFileSkim<R: Read> {
+pub struct PboFileSkim<R: Read + Seek> {
     pub(crate) reader:        PboReader<R>,
-    pub(crate) entries:       HashMap<BankEntry, u64>,
+    pub(crate) entries:       HashMap<BankSkimEntry, u64>,
     pub(crate) options:       BankSkimOptions,
     pub(crate) properties:    HashMap<String, String>
 }
 
+impl<R: Read + Seek> PboFileSkim<R> {
+    pub fn get_entry(&self, entry_name: &str) -> Option<&BankSkimEntry> {
+        self.entries.keys().find(|&entry| {
+            entry.filename.eq_ignore_ascii_case(entry_name)
+        })
+    }
+
+    pub fn read_entry(&mut self, entry: &BankSkimEntry) -> Result<Vec<u8>, EntryError> {
+        self.reader.read_entry_data(entry, self.entries.get(entry).unwrap())
+    }
+}
+
 
 #[derive(Clone, Debug)]
-pub struct PboReader<R: Read> {
+pub struct PboReader<R: Read + Seek> {
     reader:   R,
     position: u64
 }
 
-impl<R: Read> PboReader<R> {
-
+impl<R: Read + Seek> PboReader<R> {
     #[inline]
     pub fn skim_archive(reader: R, options: BankSkimOptions) -> Result<PboFileSkim<R>, BankSkimError> {
         let mut reader = PboReader { reader, position: 0 };
@@ -65,6 +76,13 @@ impl<R: Read> PboReader<R> {
         })
     }
 
+    pub fn read_entry_data(&mut self, entry: &BankSkimEntry, offset: &u64) -> Result<Vec<u8>, EntryError> {
+        // if self.reader.seek(SeekFrom::Start(*offset)).or_else(EntryError::SeekFailed)? == *offset {
+        //     //TODO: read compressed
+        // }
+        Err(EntryError::SeekFailed)
+    }
+
     ///This function does some processing on the embedded entries in the bank file, and all though
     /// there is an offset stored in the file itself, it's not used in the newer games and has since
     /// been deprecated as a waste of space.
@@ -73,15 +91,15 @@ impl<R: Read> PboReader<R> {
     /// When not using the deprecated offsets, the offsets are calculated it a pretty terrible way.
     /// In order to support this we end up doing all sorts of up/down casting.
     #[inline]
-    fn process_entries(&mut self, options: &BankSkimOptions) -> Result<(HashMap<String, String>, HashMap<BankEntry, u64>), BankSkimError> {
+    fn process_entries(&mut self, options: &BankSkimOptions) -> Result<(HashMap<String, String>, HashMap<BankSkimEntry, u64>), BankSkimError> {
         let mut properties = HashMap::new();
-        let entries: HashMap<BankEntry, u64>;
+        let entries: HashMap<BankSkimEntry, u64>;
         let end_of_bank: i32;
         let buffer_start: u64;
         {
             let mut e_offset: i32 = 0;
             let mut first: bool = true;
-            let closure_entries = BankEntry::debinarize_while(self, |e, closure_reader| {
+            let closure_entries = BankSkimEntry::debinarize_while(self, |e, closure_reader| {
                 match options.offset_location_strategy {
                     OffsetLocationStrategy::Calculate => {
                         e.start_offset = e_offset as u64;
@@ -128,15 +146,15 @@ impl<R: Read> PboReader<R> {
     }
 
     #[inline]
-    fn read_file_info(&mut self) -> Result<(bool, BankEntry), BankSkimError> {
+    fn read_file_info(&mut self) -> Result<(bool, BankSkimEntry), BankSkimError> {
         let entry = self.read_entry()?;
         return Ok((is_version(&entry), entry))
     }
 
     #[inline]
-    fn read_entry(&mut self) -> Result<BankEntry, EntryMetadataError> {
+    fn read_entry(&mut self) -> Result<BankSkimEntry, EntryMetadataError> {
         return Ok(
-            BankEntry {
+            BankSkimEntry {
                 filename: self.read_entry_name()?,
                 mime: self.read_mime()?,
                 size_unpacked: self.read_int()? as u32,
@@ -204,7 +222,7 @@ impl<R: Read + Seek> Debinarizable<PboReader<R>> for EntryMime {
     }
 }
 
-impl<R: Read> Debinarizable<PboReader<R>> for BankEntry {
+impl<R: Read + Seek> Debinarizable<PboReader<R>> for BankSkimEntry {
     type Error = EntryMetadataError;
 
     fn debinarize(reader: &mut PboReader<R>) -> Result<Self, Self::Error> {
@@ -213,11 +231,11 @@ impl<R: Read> Debinarizable<PboReader<R>> for BankEntry {
 }
 
 #[inline]
-fn is_version(entry: &BankEntry) -> bool {
+fn is_version(entry: &BankSkimEntry) -> bool {
     entry.mime == EntryMime::Version && entry.size_packed == 0 && entry.timestamp == 0
 }
 
 #[inline]
-fn empty_name(entry: &BankEntry) -> bool {
+fn empty_name(entry: &BankSkimEntry) -> bool {
     entry.filename.is_empty()
 }
