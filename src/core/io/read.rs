@@ -50,6 +50,8 @@ impl<R: Read + Seek> BufferedReader<R> {
         Ok(current)
     }
 
+
+
     pub fn unget(&mut self) -> Result<(), io::Error>{
         return if self.buffer_index == 0 {
             if self.buffer_start <= 0 {
