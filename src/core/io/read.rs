@@ -18,6 +18,19 @@ pub struct BufferedReader<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> BufferedReader<R> {
+
+    pub fn new(reader: R) -> BufferedReader<R> {
+        let mut r = BufferedReader {
+            reader,
+            buffer_start: 0,
+            buffer_index: 0,
+            buffer: [0; BUFF_SIZE],
+            actual_buffer_length: 0,
+        };
+        r.load_buffer().unwrap();
+        r
+    }
+
     fn load_buffer(&mut self) -> Result<(), io::Error> {
         self.reader.seek(SeekFrom::Start(self.buffer_start as u64))?;
         self.actual_buffer_length = self.reader.read(&mut self.buffer)?;

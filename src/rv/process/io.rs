@@ -23,7 +23,7 @@ const CONST_TOKENS: [(LexToken, &str); 19] = [
     (LexToken::DoubleHash, "##"),
     (LexToken::Undef, "undef")
 ];
-enum LexToken {
+pub enum LexToken {
     Include,
     Define,
     IfDef,
@@ -34,6 +34,7 @@ enum LexToken {
     RightParenthesis,
     Comma,
     Hash,
+    NewFile,
     NewLine,
     LineCommentStart,
     DelimitedCommentStart,
@@ -47,8 +48,6 @@ enum LexToken {
     Unknown(String)
 }
 
-
-
 fn const_token(string: String) -> LexToken {
     for (item, text) in CONST_TOKENS {
         if string.starts_with(text) {
@@ -59,12 +58,20 @@ fn const_token(string: String) -> LexToken {
 }
 
 
-struct PreProcessorReader<R: Read + Seek> {
+pub struct PreprocessorReader<R: Read + Seek> {
     reader:              BufferedReader<R>,
     directive_newlines:  u32
 }
 
-impl<R: Read + Seek> PreProcessorReader<R> {
+impl<R: Read + Seek> PreprocessorReader<R> {
+    
+    pub fn new(reader: R) -> Self {
+        Self {
+            reader: BufferedReader::new(reader),
+            directive_newlines: 0,
+        }
+    }
+
     #[inline(always)]
     fn unget(&mut self) -> Result<(), io::Error> { self.reader.unget() }
 
@@ -81,7 +88,7 @@ impl<R: Read + Seek> PreProcessorReader<R> {
     }
 
 
-    fn next_token(&mut self, max_length: usize) -> Result<LexToken, io::Error> {
+    pub fn next_token(&mut self, max_length: usize) -> Result<LexToken, io::Error> {
         let mut current = self.get_not(true, b'\r')?; self.unget()?;
         if let Some(token) = self.scan_name(max_length)? {
             return Ok(match const_token(token) {
@@ -130,7 +137,7 @@ impl<R: Read + Seek> PreProcessorReader<R> {
         })?)
     }
 
-    fn skip_whitespace(&mut self) -> Result<u8, io::Error>{
+    pub fn skip_whitespace(&mut self) -> Result<u8, io::Error>{
         loop {
             let i = self.get()?;
             if i < 33 && i != b'\n' {
