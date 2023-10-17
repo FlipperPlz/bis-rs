@@ -21,6 +21,15 @@ pub enum BankSkimError {
     EntryDebinarization(#[from] EntryMetadataError),
 }
 
+#[derive(Error, Debug)]
+pub enum EntryError {
+    #[error("Entry Read Error: The provided offset for the entry is invalid. ")]
+    SeekFailed,
+    #[error("Entry Read Error: The provided entry was not found in the bank.")]
+    EntryNotFound,
+
+}
+
 #[derive(Debug, Error)]
 pub enum EntryMetadataError {
     #[error("Bank Debinarization Error: Entry mime not supported: {0}")]
