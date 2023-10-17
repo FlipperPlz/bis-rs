@@ -106,8 +106,7 @@ impl<R: Read + Seek> PreprocessorReader<R> {
 
     pub fn next_token(&mut self, mut token_text: &mut String, max_length: usize) -> Result<LexToken, io::Error> {
         let mut current = self.get_not(true, b'\r')?; self.unget()?;
-        if let Some(mut token) = self.scan_name(max_length)? {
-            *token_text = token;
+        if self.scan_name(&mut token_text, max_length)? > 0 {
             return Ok(match const_token(token_text) {
                 LexToken::Unknown(s) => LexToken::Text(s),
                 other => other,
@@ -129,11 +128,13 @@ impl<R: Read + Seek> PreprocessorReader<R> {
         Ok(const_token(token_text))
     }
 
-    pub fn scan_name(&mut self, max_length: usize) -> Result<Option<String>, io::Error> {
+    pub fn scan_name(&mut self,
+      mut text_buffer: &mut String,
+      max_length: usize
+    ) -> Result<usize, io::Error> {
         let mut first = true;
         let mut size = 0;
-
-        Ok(self.next_while(true, |next| {
+        self.next_while(true, &mut text_buffer, |next| {
             if size < max_length { return PredicateOption::Exit }
             size += 1;
             let state: PredicateOption = match Self::valid_identifier_char(next, first) {
@@ -142,16 +143,24 @@ impl<R: Read + Seek> PreprocessorReader<R> {
             };
             if first { first = false; }
             state
-        })?)
+        })?;
+        Ok(size)
     }
 
-    pub fn scan_string(&mut self, max_length: usize, terminators: &str) -> Result<Option<String>, io::Error> {
+    pub fn scan_string(&mut self,
+      mut text_buffer: &mut String,
+      max_length: usize,
+      terminators: &str
+    ) -> Result<usize, io::Error> {
+
+        text_buffer.clear();
         let mut size = 0;
-        Ok(self.next_while(false, |next| {
+        self.next_while(false, &mut text_buffer,  |next| {
             size += 1;
             if size < max_length || terminators.as_bytes().contains(next) { PredicateOption::Exit }
             else {PredicateOption::Continue}
-        })?)
+        })?;
+        Ok(size)
     }
 
     pub fn skip_whitespace(&mut self) -> Result<u8, io::Error>{
@@ -186,14 +195,17 @@ impl<R: Read + Seek> PreprocessorReader<R> {
         }
     }
 
-    fn next_while(&mut self, use_stripped: bool, mut predicate: impl FnMut(&mut u8) -> PredicateOption) -> Result<Option<String>, io::Error> {
-        let mut string = String::new();
+    fn next_while(&mut self,
+      use_stripped: bool,
+      mut buffer: &mut String,
+      mut predicate: impl FnMut(&mut u8) -> PredicateOption
+    ) -> Result<(), io::Error> {
         loop {
             let mut peeked = if use_stripped { self.get_stripped()? } else { self.get()? };
             match predicate(&mut peeked) {
                 PredicateOption::Skip => { continue }
-                PredicateOption::Continue => {string.push(peeked as char); continue}
-                PredicateOption::Exit => { self.unget()?; return Ok(if string.is_empty() { None } else { Some(string) })}
+                PredicateOption::Continue => {buffer.push(peeked as char); continue}
+                PredicateOption::Exit => { self.unget()?; return Ok(())}
                 PredicateOption::Err(e) => { self.unget()?; return Err(e) }
             }
         }
