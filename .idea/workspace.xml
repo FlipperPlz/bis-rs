@@ -7,7 +7,12 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="" />
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Start Work On Actual Preprocessor">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/io.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/io.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,29 +31,34 @@
   <component name="MacroExpansionManager">
     <option name="directoryName" value="ux5g1pin" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 0
-}]]></component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 0
+}</component>
   <component name="ProjectId" id="2Wg6YddKIr8NG2LdXryk7AvuPTr" />
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.build.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;read/wip&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
@@ -60,11 +70,46 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1697141927948</updated>
-      <workItem from="1697141929718" duration="4395000" />
+      <workItem from="1697141929718" duration="5990000" />
+      <workItem from="1697337733280" duration="58000" />
+      <workItem from="1697337805295" duration="21054000" />
+      <workItem from="1697506431963" duration="2276000" />
+      <workItem from="1697560520247" duration="6976000" />
     </task>
+    <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
+      <option name="closed" value="true" />
+      <created>1697341287012</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1697341287012</updated>
+    </task>
+    <task id="LOCAL-00002" summary="feat(preproc): Add Some Token Support :)">
+      <option name="closed" value="true" />
+      <created>1697488135494</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1697488135494</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat(preproc): Start Work On Actual Preprocessor">
+      <option name="closed" value="true" />
+      <created>1697493623594</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1697493623595</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat(preproc): Add Back RV Preprocessor Features" />
+    <MESSAGE value="feat(preproc): Add Some Token Support :)" />
+    <MESSAGE value="feat(preproc): Start Work On Actual Preprocessor" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Start Work On Actual Preprocessor" />
   </component>
 </project>

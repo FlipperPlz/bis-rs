@@ -23,6 +23,7 @@ const CONST_TOKENS: [(LexToken, &str); 19] = [
     (LexToken::DoubleHash, "##"),
     (LexToken::Undef, "undef")
 ];
+#[derive(Debug, Clone)]
 pub enum LexToken {
     Include,
     Define,
@@ -48,13 +49,13 @@ pub enum LexToken {
     Unknown(String)
 }
 
-fn const_token(string: String) -> LexToken {
+fn const_token(string: &String) -> LexToken {
     for (item, text) in CONST_TOKENS {
         if string.starts_with(text) {
             return item;
         }
     }
-    return LexToken::Unknown(string)
+    return LexToken::Unknown(string.clone())
 }
 
 
@@ -78,6 +79,18 @@ impl<R: Read + Seek> PreprocessorReader<R> {
     #[inline(always)]
     fn get(&mut self) -> Result<u8, io::Error> { self.reader.get() }
 
+
+    #[inline(always)]
+    pub fn directive_newline_count(&self) -> u32 { self.directive_newlines }
+
+
+    #[inline(always)]
+    pub fn pop_newline_count(&mut self) { self.directive_newlines -= 1 }
+
+
+    #[inline(always)]
+    pub fn reset_newline_count(&mut self) { self.directive_newlines = 0 }
+
     #[inline(always)]
     fn get_not(&mut self, stripped: bool, not: u8) -> Result<u8, io::Error> {
         if stripped {
@@ -88,28 +101,29 @@ impl<R: Read + Seek> PreprocessorReader<R> {
     }
 
 
-    pub fn next_token(&mut self, max_length: usize) -> Result<LexToken, io::Error> {
+    pub fn next_token(&mut self, mut token_text: &mut String, max_length: usize) -> Result<LexToken, io::Error> {
         let mut current = self.get_not(true, b'\r')?; self.unget()?;
-        if let Some(token) = self.scan_name(max_length)? {
-            return Ok(match const_token(token) {
+        if let Some(mut token) = self.scan_name(max_length)? {
+            *token_text = token;
+            return Ok(match const_token(token_text) {
                 LexToken::Unknown(s) => LexToken::Text(s),
                 other => other,
             });
         } else { current = self.get()?; }
-        let mut token = String::new();
+        token_text.clear();
 
         if current == b'\\' || current == b'/' {
-            token.push(current as char);
+            token_text.push(current as char);
             current = self.get_not(true, b'\r')?;
             if current == b'\n' || current == b'*' || current == b'/' {
-                token.push(current as char);
-                token.pop();
+                token_text.push(current as char);
+                token_text.pop();
             } else { self.unget()?; }
         } else if current == b'#' {
             current = self.get_stripped()?;
-            if current != b'#' { self.unget()?; } else { token.push(current as char) }
+            if current != b'#' { self.unget()?; } else { token_text.push(current as char) }
         }
-        Ok(const_token(token))
+        Ok(const_token(token_text))
     }
 
     pub fn scan_name(&mut self, max_length: usize) -> Result<Option<String>, io::Error> {
@@ -145,6 +159,7 @@ impl<R: Read + Seek> PreprocessorReader<R> {
             }
         }
     }
+
     fn get_stripped(&mut self) -> Result<u8, io::Error>{
         let mut current = self.get_not(false, b'\r')?;
         while current == b'\\' {
