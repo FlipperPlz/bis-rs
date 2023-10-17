@@ -9,9 +9,11 @@
   <component name="ChangeListManager">
     <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Start Work On Actual Preprocessor">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/preproc/error.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/preproc/io.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/preproc/mod.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/io.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/io.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,23 +44,23 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Cargo.build.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;read/wip&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.build.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "master",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
@@ -75,6 +77,7 @@
       <workItem from="1697337805295" duration="21054000" />
       <workItem from="1697506431963" duration="2276000" />
       <workItem from="1697560520247" duration="6976000" />
+      <workItem from="1697576926392" duration="1732000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />

@@ -2,6 +2,9 @@ use std::io;
 use std::io::{Read, Seek};
 use std::str::FromStr;
 use crate::{BufferedReader, PredicateOption};
+pub const CONST_DOUBLE_QUOTE: &str = "\"";
+pub const CONST_RIGHT_ANGLE: &str = ">";
+
 const CONST_TOKENS: [(LexToken, &str); 19] = [
     (LexToken::Include, "include"),
     (LexToken::Define, "define"),
@@ -17,9 +20,9 @@ const CONST_TOKENS: [(LexToken, &str); 19] = [
     (LexToken::LineCommentStart, "//"),
     (LexToken::DelimitedCommentStart, "/*"),
     (LexToken::LineBreak, "\\\n"),
-    (LexToken::DQuote, "\""),
+    (LexToken::DQuote, CONST_DOUBLE_QUOTE),
     (LexToken::LeftAngle, "<"),
-    (LexToken::RightAngle, ">"),
+    (LexToken::RightAngle, CONST_RIGHT_ANGLE),
     (LexToken::DoubleHash, "##"),
     (LexToken::Undef, "undef")
 ];
@@ -142,11 +145,11 @@ impl<R: Read + Seek> PreprocessorReader<R> {
         })?)
     }
 
-    pub fn scan_string(&mut self, max_length: usize, terminators: &[u8]) -> Result<Option<String>, io::Error> {
+    pub fn scan_string(&mut self, max_length: usize, terminators: &str) -> Result<Option<String>, io::Error> {
         let mut size = 0;
         Ok(self.next_while(false, |next| {
             size += 1;
-            if size < max_length || terminators.contains(next) { PredicateOption::Exit }
+            if size < max_length || terminators.as_bytes().contains(next) { PredicateOption::Exit }
             else {PredicateOption::Continue}
         })?)
     }

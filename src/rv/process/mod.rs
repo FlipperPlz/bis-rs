@@ -10,7 +10,6 @@ type VoidResult = Result<(), PreprocessError>;
 
 struct Preprocessor {
     filesystem: Box<dyn FileSystem>,
-    current_file: String
 }
 
 #[derive(Error, Debug)]
@@ -27,6 +26,8 @@ pub enum PreprocessError {
         line:           u32,
         token: LexToken,
     },
+    #[error("[{0}] Include references an empty path.")]
+    EmptyInclude(u32),
     #[error("[{0}] Found endif directive outside of if block")]
     WierdEndif(u32),
     #[error("[{0}] Found else directive outside of if block")]
@@ -45,7 +46,7 @@ macro_rules! invalid_directive {
 impl Preprocessor {
     pub fn process_path<I: Read + Seek, O: Write>(&mut self,
       output: Option<&mut O>,
-      path: String
+      path: &String
     ) -> VoidResult {
         self.follow_include::<I, O>(output, path)
         //If include not found error convert to path not found
@@ -60,8 +61,8 @@ impl Preprocessor {
 
 
 
-    fn global_scan<I: Read + Seek, O: Write>(&self,
-                                             mut reader: &mut PreprocessorReader<I>,
+    fn global_scan<I: Read + Seek, O: Write>(&mut self,
+                                             reader: &mut PreprocessorReader<I>,
                                              mut output: Option<&mut O>,
                                              starting_token: LexToken
     ) -> VoidResult {
@@ -153,7 +154,7 @@ impl Preprocessor {
         Ok(())
     }
 
-    fn handle_hash<I: Read + Seek, O: Write>(&self,
+    fn handle_hash<I: Read + Seek, O: Write>(&mut self,
       reader: &mut PreprocessorReader<I>,
       current_token: &mut LexToken,
       current_line: &mut u32,
@@ -168,7 +169,7 @@ impl Preprocessor {
             });
         }
         match current_token {
-            LexToken::Include => self.consume_include_directive(reader, &mut output, current_token, current_line),
+            LexToken::Include => self.consume_include_directive(reader, output.as_deref_mut(), current_token, current_line),
             LexToken::Define => self.consume_define_directive(reader, &mut output, current_token, current_line),
             LexToken::IfDef => self.consume_if_block(reader, &mut output, current_token, current_line),
             LexToken::IfNDef => self.consume_if_not_block(reader, &mut output, current_token, current_line),
@@ -186,13 +187,12 @@ impl Preprocessor {
         }
     }
 
+    #[inline(always)]
     fn follow_include<I: Read + Seek, O: Write>(&mut self,
      output: Option<&mut O>,
-     path: String
+     path: &String
     ) -> VoidResult {
-        self.current_file = path;
-        let mut input: PreprocessorReader<I> = PreprocessorReader::new(self.locate_stream(&self.current_file)?);
-        self.global_scan(&mut input, output, LexToken::NewFile)
+        self.global_scan(&mut PreprocessorReader::<I>::new(self.locate_stream(path)?), output, LexToken::NewFile)
     }
 
     fn locate_stream<I: Read + Seek>(&self,
@@ -202,13 +202,28 @@ impl Preprocessor {
     }
 
 
-    fn consume_include_directive<I: Read + Seek, O: Write>(&self,
+    fn consume_include_directive<I: Read + Seek, O: Write>(&mut self,
       mut reader: &mut PreprocessorReader<I>,
-      output: &mut Option<&mut O>,
+      output: Option<&mut O>,
       mut current_token: &mut LexToken,
       mut current_line: &mut u32
     ) -> VoidResult {
-        todo!()
+        if let Some(mut path) = match current_token {
+            LexToken::DQuote => reader.scan_string(127, CONST_DOUBLE_QUOTE),
+            LexToken::LeftAngle => reader.scan_string(127, CONST_RIGHT_ANGLE),
+            _ => return Err(PreprocessError::InvalidToken {
+                line: current_line.clone(),
+                token: current_token.clone()
+            })
+        }? {
+            self.follow_include::<I, O>(output, &path)?;
+            *current_token = Preprocessor::get_next(reader, &mut path)?;
+
+        }
+        return Err(PreprocessError::InvalidToken {
+            line: current_line.clone(),
+            token: current_token.clone()
+        })
     }
 
     fn consume_define_directive<I: Read + Seek, O: Write>(&self,
