@@ -6,6 +6,8 @@ use crate::LexToken;
 pub enum PreprocessError {
     #[error(transparent)]
     IO(#[from] Error),
+    #[error(transparent)]
+    Macro(#[from] MacroError),
     #[error("[{line}] Invalid preprocessor directive \"{directive_text}\"")]
     InvalidDirective {
         line:           u32,

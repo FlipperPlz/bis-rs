@@ -26,7 +26,7 @@ const CONST_TOKENS: [(LexToken, &str); 19] = [
     (LexToken::DoubleHash, "##"),
     (LexToken::Undef, "undef")
 ];
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LexToken {
     Include,
     Define,
@@ -164,11 +164,13 @@ impl<R: Read + Seek> PreprocessorReader<R> {
     }
 
     pub fn skip_whitespace(&mut self) -> Result<u8, io::Error>{
+
+        let mut i = self.get()?;
         loop {
-            let i = self.get()?;
             if i < 33 && i != b'\n' {
                 return Ok(i)
             }
+            i = self.get()?;
         }
     }
 

@@ -7,10 +7,10 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Implement Include Directive">
-      <change afterPath="$PROJECT_DIR$/src/rv/process/define.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/rv/process/error.rs" afterDir="false" />
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Refactor Mutability">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/define.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/define.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/error.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/io.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/io.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
     </list>
@@ -76,7 +76,7 @@
       <workItem from="1697337805295" duration="21054000" />
       <workItem from="1697506431963" duration="2276000" />
       <workItem from="1697560520247" duration="6976000" />
-      <workItem from="1697576926392" duration="9398000" />
+      <workItem from="1697576926392" duration="13168000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />
@@ -110,7 +110,23 @@
       <option name="project" value="LOCAL" />
       <updated>1697578679721</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="feat(preproc): Implement Macro/Define Structure">
+      <option name="closed" value="true" />
+      <created>1697587063301</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1697587063301</updated>
+    </task>
+    <task id="LOCAL-00006" summary="feat(preproc): Refactor Mutability">
+      <option name="closed" value="true" />
+      <created>1697588525049</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1697588525049</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -121,6 +137,8 @@
     <MESSAGE value="feat(preproc): Add Some Token Support :)" />
     <MESSAGE value="feat(preproc): Start Work On Actual Preprocessor" />
     <MESSAGE value="feat(preproc): Implement Include Directive" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Implement Include Directive" />
+    <MESSAGE value="feat(preproc): Implement Macro/Define Structure" />
+    <MESSAGE value="feat(preproc): Refactor Mutability" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Refactor Mutability" />
   </component>
 </project>

@@ -95,7 +95,7 @@ impl Preprocessor {
         } else {
             match current_token {
                 LexToken::Include => self.consume_include_directive(reader, output, text_buffer, current_token, current_line),
-                LexToken::Define => self.consume_define_directive(reader, output, text_buffer, current_token, current_line),
+                LexToken::Define => self.consume_define_directive::<I, O>(reader, text_buffer, current_token, current_line),
                 LexToken::IfDef => self.consume_if_block(reader, output, current_token, current_line),
                 LexToken::IfNDef => self.consume_if_not_block(reader, output, current_token, current_line),
                 LexToken::Undef => self.consume_undefine_directive(reader, output, current_token, current_line),
@@ -123,13 +123,6 @@ impl Preprocessor {
         self.global_scan(&mut PreprocessorReader::<I>::new(self.locate_stream(path)?), output, LexToken::NewFile)
     }
 
-    fn locate_stream<I: Read + Seek>(&self,
-      path: &String
-    ) -> PreprocessorResult<I> {
-        todo!()
-    }
-
-
     fn consume_include_directive<I: Read + Seek, O: Write>(&mut self,
       reader: &mut PreprocessorReader<I>,
       output: &mut Option<&mut O>,
@@ -153,14 +146,72 @@ impl Preprocessor {
         Err(PreprocessError::EmptyInclude(*current_line))
     }
 
-    fn consume_define_directive<I: Read + Seek, O: Write>(&self,
+    fn consume_define_directive<I: Read + Seek, O: Write>(&mut self,
       reader: &mut PreprocessorReader<I>,
-      output: &Option<&mut O>,
       text_buffer: &mut String,
       current_token: &mut LexToken,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
+        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        let name = text_buffer.clone();
+        let macro_arguments = self.consume_macro_arguments::<I, O>(reader, text_buffer, current_token)?;
+        if *current_token != LexToken::RightParenthesis {
+            return Err(PreprocessError::InvalidToken { line: *current_line, token: current_token.clone() })
+        } else {
+            reader.skip_whitespace()?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        }
+        if text_buffer.chars().next().unwrap_or(' ') == ' ' {
+            reader.skip_whitespace()?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        }
+        let macro_value = self.consume_macro_value::<I, O>(reader, text_buffer, current_token)?;
+
+        self.add_macro(Macro::create_simple(name, macro_arguments, macro_value))
+    }
+
+    fn add_macro(&mut self, r#macro: Macro) -> PreprocessorVoidResult {
+        Ok(self.macros.push(r#macro))
+    }
+
+    fn consume_macro_value<I: Read + Seek, O: Write>(&self,
+      reader: &mut PreprocessorReader<I>,
+      text_buffer: &mut String,
+      current_token: &mut LexToken,
+    ) -> PreprocessorResult<String> {
         todo!()
+    }
+
+
+
+    fn locate_stream<I: Read + Seek>(&self,
+      path: &String
+    ) -> PreprocessorResult<I> {
+        todo!()
+    }
+
+
+    fn consume_macro_arguments<I: Read + Seek, O: Write>(&self,
+      reader: &mut PreprocessorReader<I>,
+      text_buffer: &mut String,
+      current_token: &mut LexToken,
+    ) -> PreprocessorResult<Vec<String>> {
+        let mut arguments: Vec<String> = Vec::new();
+        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        if *current_token == LexToken::LeftParenthesis {
+            reader.skip_whitespace()?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            while let LexToken::Text(parameter) = current_token.clone() {
+                arguments.push(parameter.clone());
+                reader.skip_whitespace()?;
+                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                if *current_token == LexToken::Comma {
+                    *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                }
+            }
+        }
+
+        return Ok(arguments);
     }
 
     fn consume_undefine_directive<I: Read + Seek, O: Write>(&self,

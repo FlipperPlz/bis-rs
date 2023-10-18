@@ -14,6 +14,16 @@ pub struct Macro {
 }
 
 impl Macro {
+    
+    pub fn create_simple(name: String, params: Vec<String>, contents: String) -> Self {
+        Self {
+            name,
+            params,
+            contents,
+            blocked: 0,
+        }
+    }
+    
     #[inline]
     pub fn takes_params(&self) -> bool { self.params.is_empty() }
 
