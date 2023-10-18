@@ -2,12 +2,11 @@ use crate::{MacroError};
 
 type MacroValue = String;
 type MacroParam = MacroValue;
-type MacroName = MacroValue;
+pub type MacroName = MacroValue;
 
-type MacroResult<O> = Result<O, MacroError>;
-type MacroVoidResult = MacroResult<()>;
+pub type MacroResult<O> = Result<O, MacroError>;
+pub type MacroVoidResult = MacroResult<()>;
 pub struct Macro {
-    name:       MacroName,
     params:     Vec<MacroParam>,
     contents:   MacroValue,
     blocked:    u32
@@ -15,9 +14,8 @@ pub struct Macro {
 
 impl Macro {
     
-    pub fn create_simple(name: String, params: Vec<String>, contents: String) -> Self {
+    pub fn create_simple(params: Vec<String>, contents: String) -> Self {
         Self {
-            name,
             params,
             contents,
             blocked: 0,
@@ -73,8 +71,6 @@ impl Macro {
         self.contents = self.contents.replace(&old_param.to_string(), &*new_name);
         self.force_rename_param(old_param, new_name)
     }
-
-
 
     fn validate_param_name(name: &String) -> bool { /*TODO*/true }
 

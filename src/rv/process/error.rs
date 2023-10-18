@@ -18,6 +18,10 @@ pub enum PreprocessError {
         line:           u32,
         token: LexToken,
     },
+    #[error("Missing EndIf for IfDef/IfNDef on line {0}")]
+    MissingEndIf(u32),
+    #[error("Found multiple else directives for IfDef/IfNDef on line {0}")]
+    MultipleElseDirectives(u32),
     #[error("[{0}] Include references an empty path.")]
     EmptyInclude(u32),
     #[error("[{0}] Found endif directive outside of if block")]
@@ -30,8 +34,12 @@ pub enum PreprocessError {
 pub enum MacroError {
     #[error("Couldn't find macro parameter {0}")]
     UnknownMacroParameter(String),
+    #[error("Couldn't find macro named {0}")]
+    UnknownMacro(String),
     #[error("The parameter {0} already exists in the macro")]
     MacroParameterExists(String),
+    #[error("A macro named {0} already exists in the current context.")]
+    MacroExists(String),
     #[error("The parameter name {0} is invalid. ")]
     InvalidMacroParameterName(String),
 }
