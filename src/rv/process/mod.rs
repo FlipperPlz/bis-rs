@@ -63,10 +63,13 @@ impl Preprocessor {
                     }
                 }
                 _ => {
-                    if let (false, Some(out)) = (quoted, output) {
-                        out.write(text_buffer.as_bytes())?;
-                    } else {
-                        Self::continue_output(&mut text_buffer, &mut current_token, output, reader)?;
+                    match output {
+                        Some(out) if !quoted => {
+                            out.write(text_buffer.as_bytes())?;
+                        }
+                        _ => {
+                            Self::continue_output(&mut text_buffer, &mut current_token, output, reader)?;
+                        }
                     }
                 }
             }
