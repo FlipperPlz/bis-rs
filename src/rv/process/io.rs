@@ -48,8 +48,8 @@ pub enum LexToken {
     RightAngle,
     DoubleHash,
     Undef,
-    Text(String),
-    Unknown(String)
+    Text,
+    Unknown
 }
 
 fn const_token(string: &String) -> LexToken {
@@ -58,7 +58,7 @@ fn const_token(string: &String) -> LexToken {
             return item;
         }
     }
-    return LexToken::Unknown(string.clone())
+    return LexToken::Unknown
 }
 
 
@@ -109,7 +109,7 @@ impl<R: Read + Seek> PreprocessorReader<R> {
         let mut current = self.get_not(true, b'\r')?; self.unget()?;
         if self.scan_name(&mut token_text, max_length)? > 0 {
             return Ok(match const_token(token_text) {
-                LexToken::Unknown(s) => LexToken::Text(s),
+                LexToken::Unknown => LexToken::Text,
                 other => other,
             });
         } else { current = self.get()?; }
