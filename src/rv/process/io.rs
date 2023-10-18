@@ -80,7 +80,7 @@ impl<R: Read + Seek> PreprocessorReader<R> {
     fn unget(&mut self) -> Result<(), io::Error> { self.reader.unget() }
 
     #[inline(always)]
-    fn get(&mut self) -> Result<u8, io::Error> { self.reader.get() }
+    pub(crate) fn get(&mut self) -> Result<u8, io::Error> { self.reader.get() }
 
 
     #[inline(always)]
@@ -102,6 +102,7 @@ impl<R: Read + Seek> PreprocessorReader<R> {
             Ok(current)
         } else { self.reader.get_not(not) }
     }
+
 
 
     pub fn next_token(&mut self, mut token_text: &mut String, max_length: usize) -> Result<LexToken, io::Error> {

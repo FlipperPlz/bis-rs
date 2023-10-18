@@ -48,11 +48,11 @@ impl Preprocessor {
                     }
                 }
                 LexToken::DelimitedCommentStart => {
-                    self.consume_block_comment(reader, output, &mut current_token, &mut current_line)?;
+                    self.consume_block_comment::<I, O>(reader, output, &mut current_line)?;
                     current_token = Self::get_next(reader, &mut text_buffer)?;
                 }
                 LexToken::LineCommentStart => {
-                    self.consume_line_comment(reader, output, &mut current_token, &mut current_line)?;
+                    self.consume_line_comment::<I, O>(reader, &mut current_token, &mut current_line)?;
                     current_token = Self::get_next(reader, &mut text_buffer)?;
                 }
                 LexToken::Text(_) => {
@@ -63,13 +63,8 @@ impl Preprocessor {
                     }
                 }
                 _ => {
-                    if quoted {
-                        match output {
-                            None => {}
-                            Some(out) => {
-                               out.write(text_buffer.as_bytes())?;
-                            },
-                        }
+                    if let (false, Some(out)) = (quoted, output) {
+                        out.write(text_buffer.as_bytes())?;
                     } else {
                         Self::continue_output(&mut text_buffer, &mut current_token, output, reader)?;
                     }
@@ -87,29 +82,29 @@ impl Preprocessor {
     ) -> PreprocessorVoidResult {
         *current_token = Preprocessor::get_next(reader, text_buffer)?;
         reader.skip_whitespace()?;
-        return if let None = output {
-             Err(PreprocessError::InvalidToken {
+        if let None = output {
+            return Err(PreprocessError::InvalidToken {
                 line: *current_line,
                 token: current_token.clone()
             })
-        } else {
-            match current_token {
-                LexToken::Include => self.consume_include_directive(reader, output, text_buffer, current_token, current_line),
-                LexToken::Define => self.consume_define_directive::<I, O>(reader, text_buffer, current_token, current_line),
-                LexToken::IfDef => self.consume_if_block(reader, output, current_token, current_line),
-                LexToken::IfNDef => self.consume_if_not_block(reader, output, current_token, current_line),
-                LexToken::Undef => self.consume_undefine_directive(reader, output, current_token, current_line),
-                LexToken::Else => Err(PreprocessError::WierdElse(*current_line)),
-                LexToken::EndIf => Err(PreprocessError::WierdEndif(*current_line)),
-                LexToken::Unknown(s) => Err(PreprocessError::InvalidDirective {
-                    line: *current_line,
-                    directive_text: s.to_string()
-                }),
-                _ => Err(PreprocessError::InvalidToken {
-                    line: *current_line,
-                    token: current_token.clone()
-                }),
-            }
+        }
+
+        return match current_token {
+            LexToken::Include => self.consume_include_directive(reader, output, text_buffer, current_token, current_line),
+            LexToken::Define => self.consume_define_directive::<I, O>(reader, output, text_buffer, current_token, current_line),
+            LexToken::IfDef => self.consume_if_block(reader, output, current_token, current_line),
+            LexToken::IfNDef => self.consume_if_not_block(reader, output, current_token, current_line),
+            LexToken::Undef => self.consume_undefine_directive(reader, output, current_token, current_line),
+            LexToken::Else => Err(PreprocessError::WierdElse(*current_line)),
+            LexToken::EndIf => Err(PreprocessError::WierdEndif(*current_line)),
+            LexToken::Unknown(s) => Err(PreprocessError::InvalidDirective {
+                line: *current_line,
+                directive_text: s.to_string()
+            }),
+            _ => Err(PreprocessError::InvalidToken {
+                line: *current_line,
+                token: current_token.clone()
+            }),
         }
     }
 
@@ -148,6 +143,7 @@ impl Preprocessor {
 
     fn consume_define_directive<I: Read + Seek, O: Write>(&mut self,
       reader: &mut PreprocessorReader<I>,
+      output: &mut Option<&mut O>,
       text_buffer: &mut String,
       current_token: &mut LexToken,
       current_line: &mut u32
@@ -165,7 +161,7 @@ impl Preprocessor {
             reader.skip_whitespace()?;
             *current_token = Preprocessor::get_next(reader, text_buffer)?;
         }
-        let macro_value = self.consume_macro_value::<I, O>(reader, text_buffer, current_token)?;
+        let macro_value = self.consume_macro_value::<I, O>(reader, output, text_buffer, current_token, current_line)?;
 
         self.add_macro(Macro::create_simple(name, macro_arguments, macro_value))
     }
@@ -173,23 +169,6 @@ impl Preprocessor {
     fn add_macro(&mut self, r#macro: Macro) -> PreprocessorVoidResult {
         Ok(self.macros.push(r#macro))
     }
-
-    fn consume_macro_value<I: Read + Seek, O: Write>(&self,
-      reader: &mut PreprocessorReader<I>,
-      text_buffer: &mut String,
-      current_token: &mut LexToken,
-    ) -> PreprocessorResult<String> {
-        todo!()
-    }
-
-
-
-    fn locate_stream<I: Read + Seek>(&self,
-      path: &String
-    ) -> PreprocessorResult<I> {
-        todo!()
-    }
-
 
     fn consume_macro_arguments<I: Read + Seek, O: Write>(&self,
       reader: &mut PreprocessorReader<I>,
@@ -212,6 +191,42 @@ impl Preprocessor {
         }
 
         return Ok(arguments);
+    }
+
+    fn consume_macro_value<I: Read + Seek, O: Write>(&self,
+      reader: &mut PreprocessorReader<I>,
+      output: &mut Option<&mut O>,
+      text_buffer: &mut String,
+      current_token: &mut LexToken,
+      current_line: &mut u32
+    ) -> PreprocessorResult<String> {
+        let mut value = String::new();
+        while *current_token != LexToken::NewLine {
+            match current_token {
+                LexToken::LineCommentStart => self.consume_line_comment::<I, O>(reader, current_token, current_line)?,
+                LexToken::DelimitedCommentStart =>  self.consume_block_comment::<I, O>(reader, output, current_line)?,
+
+                _ => {value += text_buffer;}
+            }
+
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        }
+        Ok(value)
+    }
+
+    #[inline(always)]
+    fn consume_block_comment<I: Read + Seek, O: Write>(&self,
+      reader: &mut PreprocessorReader<I>,
+      output: &mut Option<&mut O>,
+      current_line: &mut u32
+    ) -> PreprocessorVoidResult {
+        reader.skip_block_comment(current_line, output)
+    }
+
+    fn locate_stream<I: Read + Seek>(&self,
+      path: &String
+    ) -> PreprocessorResult<I> {
+        todo!()
     }
 
     fn consume_undefine_directive<I: Read + Seek, O: Write>(&self,
@@ -241,18 +256,10 @@ impl Preprocessor {
         todo!()
     }
 
-    fn consume_block_comment<I: Read + Seek, O: Write>(&self,
-      reader: &mut PreprocessorReader<I>,
-      output: &Option<&mut O>,
-      current_token: &mut LexToken,
-      current_line: &mut u32
-    ) -> PreprocessorVoidResult {
-        todo!()
-    }
+
 
     fn consume_line_comment<I: Read + Seek, O: Write>(&self,
       reader: &mut PreprocessorReader<I>,
-      output: &Option<&mut O>,
       current_token: &mut LexToken,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
@@ -317,3 +324,23 @@ impl Preprocessor {
 
 }
 
+impl<R: Read + Seek> PreprocessorReader<R> {
+    fn skip_block_comment<O: Write>(&mut self,
+      line_count: &mut u32,
+      output: &mut Option<&mut O>
+    ) -> PreprocessorVoidResult {
+        let mut current = self.get()?;
+        let mut last: u8 = 0;
+        while last != b'*' || current != b'/' {
+            if current == b'\n' {
+                *line_count += 1;
+                if let Some(ref mut out) = output {
+                    out.write_u8(current.clone())?;
+                }
+            }
+            last = current;
+            current = self.get()?;
+        }
+        Ok(())
+    }
+}
