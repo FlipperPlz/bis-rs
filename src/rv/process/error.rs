@@ -28,6 +28,8 @@ pub enum PreprocessError {
     WierdEndif(u32),
     #[error("[{0}] Found else directive outside of if block")]
     WierdElse(u32),
+    #[error("Unknown Error Occurred")]
+    Unknown
 }
 
 #[derive(Error, Debug)]
@@ -40,6 +42,8 @@ pub enum MacroError {
     MacroParameterExists(String),
     #[error("A macro named {0} already exists in the current context.")]
     MacroExists(String),
+    #[error("Could not expand macro {0} with {1} arguments, {0} expects {2}.")]
+    InvalidParameterCount(String, usize, usize),
     #[error("The parameter name {0} is invalid. ")]
     InvalidMacroParameterName(String),
 }

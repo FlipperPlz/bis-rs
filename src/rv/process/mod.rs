@@ -1,11 +1,9 @@
-pub mod io;
-
+pub mod io; pub use io::*;
+pub mod error; pub use error::*;
+pub mod define; pub use define::*;
 use std::collections::HashMap;
 use std::hash::Hash;
-pub use io::*;
-pub mod error;pub use error::*;
-pub mod define; pub use define::*;
-use std::io::{Error, Read, Seek, Write};
+use std::io::{Cursor, Error, Read, Seek, Write};
 use byteorder::WriteBytesExt;
 use vfs::FileSystem;
 
@@ -20,13 +18,14 @@ struct Preprocessor {
 impl Preprocessor {
     pub fn process_path<I: Read + Seek, O: Write>(&mut self,
       output: &mut Option<&mut O>,
-      path: &String
+      path: String
     ) -> PreprocessorVoidResult {
-        self.follow_include::<I, O>(output, path)
+        self.follow_include::<I, O>(output, &mut path.clone())
         //If include not found error convert to path not found
     }
 
     fn global_scan<I: Read + Seek, O: Write>(&mut self,
+      current_path: &mut String,
       reader: &mut PreprocessorReader<I>,
       output: &mut Option<&mut O>,
       starting_token: &mut LexToken,
@@ -46,7 +45,7 @@ impl Preprocessor {
                     if quoted {
                         Self::continue_output(text_buffer,  starting_token, output, reader)?;
                     } else {
-                        self.handle_hash(reader, text_buffer, starting_token, current_line, output)?;
+                        self.handle_hash(current_path, reader, text_buffer, starting_token, current_line, output)?;
                     }
                 }
                 LexToken::DelimitedCommentStart => {
@@ -54,14 +53,17 @@ impl Preprocessor {
                     *starting_token = Self::get_next(reader, text_buffer)?;
                 }
                 LexToken::LineCommentStart => {
-                    self.consume_line_comment::<I, O>(reader, starting_token, current_line)?;
+                    self.consume_line_comment::<I, O>(reader, current_line)?;
                     *starting_token = Self::get_next(reader, text_buffer)?;
                 }
                 LexToken::Text => {
-                    if !quoted {
-                        self.try_expand_macro(&text_buffer, reader, output, starting_token, current_line)?;
-                    } else {
-                        Self::continue_output(text_buffer,  starting_token, output, reader)?;
+                    match output {
+                        Some(out) if !quoted => {
+                            self.try_expand_macro(current_path, text_buffer, reader, out, starting_token, current_line)?;
+                        }
+                        _ => {
+                            Self::continue_output(text_buffer,  starting_token, output, reader)?;
+                        }
                     }
                 }
                 _ => {
@@ -79,6 +81,7 @@ impl Preprocessor {
     }
 
     fn handle_hash<I: Read + Seek, O: Write>(&mut self,
+      current_path: &mut String,
       reader: &mut PreprocessorReader<I>,
       text_buffer:   &mut String,
       current_token: &mut LexToken,
@@ -97,8 +100,8 @@ impl Preprocessor {
         return match current_token {
             LexToken::Include => self.consume_include_directive(reader, output, text_buffer, current_token, current_line),
             LexToken::Define => self.consume_define_directive::<I, O>(reader, output, text_buffer, current_token, current_line),
-            LexToken::IfDef => self.consume_if_block(reader, text_buffer, true, output, current_token, current_line),
-            LexToken::IfNDef =>  self.consume_if_block(reader, text_buffer, false, output, current_token, current_line),
+            LexToken::IfDef => self.consume_if_block(current_path, reader, text_buffer, true, output, current_token, current_line),
+            LexToken::IfNDef =>  self.consume_if_block(current_path, reader, text_buffer, false, output, current_token, current_line),
             LexToken::Undef => self.consume_undefine_directive::<I,O>(reader, text_buffer, current_token, current_line),
             LexToken::Else => Err(PreprocessError::WierdElse(*current_line)),
             LexToken::EndIf => Err(PreprocessError::WierdEndif(*current_line)),
@@ -116,9 +119,9 @@ impl Preprocessor {
     #[inline(always)]
     fn follow_include<I: Read + Seek, O: Write>(&mut self,
       output: &mut Option<&mut O>,
-      path: &String
+      path: &mut String
     ) -> PreprocessorVoidResult {
-        self.global_scan(&mut PreprocessorReader::<I>::new(self.locate_stream(path)?), output, &mut LexToken::NewFile, &mut 0, &mut String::new())
+        self.global_scan(path, &mut PreprocessorReader::<I>::new(self.locate_stream(path)?), output, &mut LexToken::NewFile, &mut 0, &mut String::new())
     }
 
     fn consume_include_directive<I: Read + Seek, O: Write>(&mut self,
@@ -136,7 +139,7 @@ impl Preprocessor {
                 token: current_token.clone()
             })
         }? > 0 {
-            self.follow_include::<I, O>(output, &text_buffer)?;
+            self.follow_include::<I, O>(output, text_buffer)?;
             *current_token = Preprocessor::get_next(reader, text_buffer)?;
             return Ok(());
         }
@@ -231,7 +234,7 @@ impl Preprocessor {
         let mut value = String::new();
         while *current_token != LexToken::NewLine {
             match current_token {
-                LexToken::LineCommentStart => self.consume_line_comment::<I, O>(reader, current_token, current_line)?,
+                LexToken::LineCommentStart => self.consume_line_comment::<I, O>(reader, current_line)?,
                 LexToken::DelimitedCommentStart =>  self.consume_block_comment::<I, O>(reader, output, current_line)?,
 
                 _ => {value += text_buffer;}
@@ -248,7 +251,19 @@ impl Preprocessor {
       output: &mut Option<&mut O>,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
-        reader.skip_block_comment(current_line, output)
+        let mut current = reader.get()?;
+        let mut last: u8 = 0;
+        while last != b'*' || current != b'/' {
+            if current == b'\n' {
+                *current_line += 1;
+                if let Some(ref mut out) = output {
+                    out.write_u8(current.clone())?;
+                }
+            }
+            last = current;
+            current = reader.get()?;
+        }
+        Ok(())
     }
 
     fn consume_undefine_directive<I: Read + Seek, O: Write>(&mut self,
@@ -272,6 +287,7 @@ impl Preprocessor {
     }
 
     fn consume_if_block<I: Read + Seek, O: Write>(&mut self,
+      current_path: &mut String,
       reader: &mut PreprocessorReader<I>,
       text_buffer: &mut String,
       negated: bool,
@@ -296,6 +312,7 @@ impl Preprocessor {
         let mut found_else = false;
         loop {
             match self.global_scan(
+                current_path,
                 reader,
                 if skip_block { null_output } else { output },
                 current_token,
@@ -318,6 +335,7 @@ impl Preprocessor {
                             found_else = true;
                             *current_token = Preprocessor::get_next(reader, text_buffer)?;
                             self.global_scan(
+                                current_path,
                                 reader,
                                 if !skip_block { null_output } else { output },
                                 current_token,
@@ -335,20 +353,147 @@ impl Preprocessor {
 
     fn consume_line_comment<I: Read + Seek, O: Write>(&self,
       reader: &mut PreprocessorReader<I>,
-      current_token: &mut LexToken,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
-        todo!()
+        let mut current = reader.get()?;
+        while current != b'\n' {
+            current = reader.get()?
+        }
+        *current_line += 1;
+        Ok(())
     }
 
     fn try_expand_macro<I: Read + Seek, O: Write>(&self,
-      macro_name: &String,
+      current_path: &String,
+      text_buffer: &mut String,
       reader: &mut PreprocessorReader<I>,
-      output: &mut Option<&mut O>,
+      output: &mut O,
       current_token: &mut LexToken,
       current_line: &mut u32
-    ) -> PreprocessorVoidResult {
-        todo!()
+    ) -> PreprocessorResult<bool> {
+        let macro_name = text_buffer.clone();
+        return if *text_buffer == "__FILE__"  {
+            output.write(format!("\"{}\"", current_path).as_bytes())?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            Ok(true)
+        } else if *text_buffer == "__LINE__" {
+            output.write(format!("\"{}\"", current_line).as_bytes())?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            Ok(true)
+        } else if let Some(found_macro) = self.find_macro(text_buffer) {
+            if !found_macro.takes_params() {
+                output.write(found_macro.get_value().as_bytes())?;
+                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                Ok(true)
+            } else if found_macro.blocked() {
+                output.write(found_macro.get_value().as_bytes())?;
+                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                Ok(false)
+            } else {
+                let arguments = self.read_macro_parameters(macro_name, found_macro, current_path, text_buffer, current_token, current_line, reader);
+
+
+                todo!()
+            }
+        } else {
+            output.write(text_buffer.as_bytes())?;
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            Ok(false)
+        }
+
+    }
+
+    fn read_macro_parameters<I: Read + Seek>(&self,
+        macro_name: String,
+        macro_obj: &Macro,
+        current_path: &String,
+        text_buffer: &mut String,
+        current_token: &mut LexToken,
+        current_line: &mut u32,
+        reader: &mut PreprocessorReader<I>,
+    ) -> PreprocessorResult<Vec<String>> {
+        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        let mut parameters = Vec::new();
+        let max = macro_obj.parameter_count();
+        if *current_token != LexToken::LeftParenthesis {
+            return Err(PreprocessError::from(
+                MacroError::InvalidParameterCount(
+                    macro_name,
+                    0,
+                    max
+                )
+            ))
+        }
+        loop {
+            let should_end = self.read_macro_parameter(current_path, text_buffer, current_token, current_line, reader)?;
+            parameters.push(text_buffer.clone());
+            if parameters.len() > max {
+                return Err(PreprocessError::from(
+                    MacroError::InvalidParameterCount(
+                        macro_name,
+                        parameters.len(),
+                        max
+                    )
+                ))
+            }
+            if should_end {break;}
+        }
+        Ok(parameters)
+    }
+
+    fn read_macro_parameter<I: Read + Seek>(
+        &self,
+        current_path: &String,
+        text_buffer: &mut String,
+        current_token: &mut LexToken,
+        current_line: &mut u32,
+        reader: &mut PreprocessorReader<I>,
+    ) -> PreprocessorResult<bool> {
+        let mut parameter = String::new();
+        let mut parenthesis_count = 0;
+        let mut quoted = false;
+        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        loop {
+            match current_token {
+                LexToken::LeftParenthesis => {
+                    if !quoted {parenthesis_count += 1;}
+                    // parameter += text_buffer;
+                }
+                LexToken::RightParenthesis => {
+                    if !quoted {
+                        if parenthesis_count == 0 {
+                            *text_buffer = parameter;
+                            return Ok(true);
+                        } else { parenthesis_count -= 1 }
+                    }
+                    parameter += text_buffer;
+                },
+                LexToken::DQuote => {
+                    quoted = !quoted;
+                    parameter += text_buffer;
+                }
+                LexToken::Comma => {
+                    if parenthesis_count == 0 && !quoted {
+                        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                        *text_buffer = parameter;
+                        return Ok(false);
+                    }
+                }
+                LexToken::Text => {
+                    if !quoted {
+                        let mut buffer = Cursor::new(Vec::new());
+                        if self.try_expand_macro(current_path, text_buffer, reader, &mut buffer, current_token, current_line)? {
+                            return Ok(false);
+                        } else {
+                            parameter += std::str::from_utf8(buffer.get_ref()).unwrap()
+                        }
+                    }
+                }
+                _ => parameter += text_buffer,
+            }
+            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+
+        }
     }
 
     fn locate_stream<I: Read + Seek>(&self,
@@ -404,25 +549,4 @@ impl Preprocessor {
         reader.next_token(token_buffer, 128)
     }
 
-}
-
-impl<R: Read + Seek> PreprocessorReader<R> {
-    fn skip_block_comment<O: Write>(&mut self,
-      line_count: &mut u32,
-      output: &mut Option<&mut O>
-    ) -> PreprocessorVoidResult {
-        let mut current = self.get()?;
-        let mut last: u8 = 0;
-        while last != b'*' || current != b'/' {
-            if current == b'\n' {
-                *line_count += 1;
-                if let Some(ref mut out) = output {
-                    out.write_u8(current.clone())?;
-                }
-            }
-            last = current;
-            current = self.get()?;
-        }
-        Ok(())
-    }
 }
