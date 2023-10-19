@@ -6,6 +6,7 @@ use std::hash::Hash;
 use std::io::{Cursor, Error, Read, Seek, Write};
 use byteorder::WriteBytesExt;
 use vfs::FileSystem;
+use crate::{Lexer, LexicalPreProcessor};
 
 type PreprocessorResult<O> = Result<O, PreprocessError>;
 type PreprocessorVoidResult = PreprocessorResult<()>;
@@ -13,6 +14,14 @@ type PreprocessorVoidResult = PreprocessorResult<()>;
 struct Preprocessor {
     filesystem: Box<dyn FileSystem>,
     macros:     HashMap<MacroName, Macro>
+}
+
+impl LexicalPreProcessor for Preprocessor {
+    type E = PreprocessError;
+
+    fn process(&mut self, lexer: &mut Lexer) -> Result<(), Self::E> {
+        todo!()
+    }
 }
 
 impl Preprocessor {

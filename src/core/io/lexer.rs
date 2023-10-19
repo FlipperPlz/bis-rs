@@ -1,4 +1,4 @@
-
+use std::error::Error;
 use thiserror::Error;
 use crate::{Analyser, AnalysisError, MutAnalyser};
 
@@ -14,6 +14,20 @@ pub struct Lexer {
     mutable:     bool,
     cursor:      usize,
     contents:    Vec<u8>
+}
+
+impl Lexer {
+    pub fn new<B: AsRef<[u8]>>(contents: B, mutable: bool) -> Self {
+        Self {
+            mutable,
+            cursor: 0,
+            contents: Vec::from(contents.as_ref()),
+        }
+    }
+}
+pub trait Tokenizer: Analyser<u8> {
+    type Token: Sized;
+    fn next_token(&mut self) -> Self::Token;
 }
 
 impl Analyser<u8> for Lexer {

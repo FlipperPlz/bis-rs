@@ -16,6 +16,5 @@ env_logger = { version = "0.10.0", features = [] }
 
 [lib]
 crate-type = ["cdylib"]
-
 [profile.release]
 opt-level = 3

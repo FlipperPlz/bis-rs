@@ -36,6 +36,13 @@ pub trait Analyser<T: Sized + PartialEq + Clone> {
     #[inline]
     fn is_end(&self) -> bool { self.pos() >= self.len() }
 
+    #[inline]
+    fn reset(&mut self) -> usize {
+        let old = self.pos();
+        self.set_cursor(0);
+        return old
+    }
+
     fn seek(&mut self, pos: SeekFrom) -> Result<usize, Self::E> where Self: Sized  {
         let position = calculate_peek_position(self, pos)?;
 
