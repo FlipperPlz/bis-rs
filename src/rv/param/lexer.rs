@@ -1,8 +1,7 @@
 use std::{io};
 use log::error;
 use thiserror::Error;
-use crate::{Analyser, Lexer, ParamLiteral, ScopedTokenizer, Tokenizer};
-use std::string::String;
+use crate::{Analyser, Lexer, ScopedTokenizer, Tokenizer};
 
 #[derive(Error, Debug)]
 pub enum ParamLexerError {
@@ -45,6 +44,10 @@ impl ParamLexer {
     }
 
     fn next_expression(&mut self) -> LexerResult<ParamToken> {
+        todo!()
+    }
+
+    fn process_line_directive(&self) -> LexerResult<()> {
         todo!()
     }
 
@@ -99,10 +102,10 @@ impl ParamLexer {
         return Ok(self.get_range(start, self.pos()));
     }
 
-    fn take_string(&mut self, terminators: &[u8]) -> LexerResult<ParamLiteral> {
+    fn take_string(&mut self, terminators: &[u8]) -> LexerResult<ParamToken> {
         let mut current = self.skip_space()?;
-        let mut contents: Vec<u8> = vec![];
-        let quoted = match current {
+        let mut data: Vec<u8> = vec![];
+        let double_quoted = match current {
             b'"' => {
                 current = self.get().ok_or(ParamLexerError::EndReached)?;
                 loop {
@@ -111,7 +114,7 @@ impl ParamLexer {
                         c if c == b'\n' ||c == b'\r' => return Err(ParamLexerError::ExpectedToken),
                         _ => {}
                     }
-                    contents.push(current)
+                    data.push(current)
                 }
                 true
             },
@@ -121,15 +124,18 @@ impl ParamLexer {
                         if self.try_match_terminated_string_end(&mut current, terminators)? { break }
                     }
 
-                    contents.push(current)
+                    data.push(current)
                 }
-                while !contents.is_empty() && is_space(contents.last().unwrap()) { contents.pop(); }
+                while !data.is_empty() && is_space(data.last().unwrap()) { data.pop(); }
 
                 self.step_back().ok_or(ParamLexerError::EndReached)?;
                 false
             }
         };
-        return Ok(ParamLiteral::String(quoted, String::from_utf8(contents).unwrap()))
+        return Ok(ParamToken::LiteralString {
+            double_quoted,
+            data,
+        })
     }
 
     fn skip_space(&mut self) -> LexerResult<u8> {
@@ -179,9 +185,6 @@ impl ParamLexer {
             self.step_back();
             return Ok(true)
         }
-    }
-    fn process_line_directive(&self) -> LexerResult<()> {
-        todo!()
     }
 }
 
