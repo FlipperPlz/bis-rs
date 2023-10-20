@@ -1,50 +1,21 @@
-
-use crate::{Analyser, Lexer, Parseable, Tokenizer};
+use thiserror::Error;
+use crate::{ParamLexer, ParamLexerError, Parser, Tokenizer};
 use crate::param::ParamFile;
 
-type ParamLexer = Lexer;
-struct ParamParser;
+#[derive(Error, Debug)]
+pub enum ParamParseError {
+    #[error(transparent)]
+    Lexical(#[from] ParamLexerError),
 
-enum ParamToken {
-    ClassKeyword,
-    DeleteKeyword,
-    EnumKeyword,
-    SemiColon,
-    Colon,
-    LeftCurly,
-    RightCurly,
-    LeftSquare,
-    RightSquare,
-    Assign,
-    AddAssign,
-    SubAssign,
-    Comma,
-    Identifier([u8]),
-    String {
-        quoted: bool,
-        data: [u8]
-    },
-    Integer(i32),
-    Float(f32),
-    Double(f64),
-    Unknown([u8])
 
 }
 
-impl Parseable for ParamFile {
-    type E = ();
-    type P = ();
+impl Parser for ParamFile {
+    type E = ParamParseError;
 
-    fn try_parse(lexer: &mut Lexer) -> Result<Self, Self::E> {
+    fn try_parse(lexer: &mut ParamLexer) -> Result<Self, Self::E> {
+        let mut current_token = lexer.next_token()?;
         todo!()
     }
 }
 
-impl Tokenizer for ParamLexer {
-    type Token = ParamToken;
-
-    fn next_token(&mut self) -> &mut Self::Token {
-        todo!()
-    }
-
-}

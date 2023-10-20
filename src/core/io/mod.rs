@@ -4,3 +4,4 @@ pub mod read;        pub use read::*;
 pub mod analysis;    pub use analysis::*;
 pub mod parser;      pub use parser::*;
 pub mod lexer;       pub use lexer::*;
+pub mod macros;      pub use macros::*;

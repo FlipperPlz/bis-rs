@@ -7,13 +7,19 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="fix(param): Start Work On The Real Lexers In Town">
-      <change afterPath="$PROJECT_DIR$/src/core/io/parser.rs" afterDir="false" />
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="fix(param): Fix Up Trait System">
+      <change afterPath="$PROJECT_DIR$/src/core/io/macros.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/rv/param/lexer.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/io/analysis.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/io/analysis.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/io/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/io/lexer.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/core/io/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/io/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/io/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/io/parser.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/mime.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/param/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/param/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/parser.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/error.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
@@ -85,7 +91,10 @@
       <workItem from="1697685830501" duration="679000" />
       <workItem from="1697686527525" duration="586000" />
       <workItem from="1697687132113" duration="63000" />
-      <workItem from="1697728471234" duration="16074000" />
+      <workItem from="1697728471234" duration="16412000" />
+      <workItem from="1697759510177" duration="1220000" />
+      <workItem from="1697764455910" duration="6940000" />
+      <workItem from="1697771871463" duration="8331000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />
@@ -191,7 +200,15 @@
       <option name="project" value="LOCAL" />
       <updated>1697753411778</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="fix(param): Work On Lexer/Parser Trait System">
+      <option name="closed" value="true" />
+      <created>1697759101388</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1697759101388</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -210,6 +227,7 @@
     <MESSAGE value="fix(preproc): Add More Directive Support (ifdef/ifndef/comment/undefine)" />
     <MESSAGE value="fix(preproc): More Work On Macro Expansion" />
     <MESSAGE value="fix(param): Start Work On The Real Lexers In Town" />
-    <option name="LAST_COMMIT_MESSAGE" value="fix(param): Start Work On The Real Lexers In Town" />
+    <MESSAGE value="fix(param): Work On Lexer/Parser Trait System" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix(param): Work On Lexer/Parser Trait System" />
   </component>
 </project>

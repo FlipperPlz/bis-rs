@@ -1,14 +1,6 @@
 use std::error::Error;
-use thiserror::Error;
-use crate::{Analyser, AnalysisError, MutAnalyser};
-
-#[derive(Debug, Error)]
-pub enum LexicalError {
-    #[error(transparent)]
-    Analysis(#[from] AnalysisError),
-    #[error("This lexer is not mutable")]
-    Immutable,
-}
+use std::io;
+use crate::{Analyser, MutAnalyser};
 
 pub struct Lexer {
     mutable:     bool,
@@ -25,13 +17,32 @@ impl Lexer {
         }
     }
 }
-pub trait Tokenizer: Analyser<u8> {
-    type Token: Sized;
-    fn next_token(&mut self) -> Self::Token;
+
+pub trait Tokenizer {
+    type Token;
+    type Error: Error;
+
+    fn next_token(&mut self) -> Result<Self::Token, Self::Error>;
+}
+
+pub trait ScopedTokenizer {
+    type Token;
+    type Error: Error;
+    type Scope;
+
+    fn next_token(&mut self, scope: Self::Scope) -> Result<Self::Token, Self::Error>;
+}
+
+impl<Tok: ScopedTokenizer<Scope = S>, S: Default> Tokenizer for Tok {
+    type Token = Tok::Token;
+    type Error = Tok::Error;
+
+    fn next_token(&mut self) -> Result<Self::Token, Self::Error> {
+        self.next_token(S::default())
+    }
 }
 
 impl Analyser<u8> for Lexer {
-    type E = LexicalError;
 
     #[inline]
     fn contents(&self) -> &Vec<u8> { &self.contents }
@@ -44,8 +55,8 @@ impl Analyser<u8> for Lexer {
 }
 
 impl MutAnalyser<u8> for Lexer {
-    fn contents_mut(&mut self) -> Result<&mut Vec<u8>, Self::E> {
-        return if !self.mutable { Err(LexicalError::Immutable) } else {
+    fn contents_mut(&mut self) -> io::Result<&mut Vec<u8>> {
+        return if !self.mutable { Err(io::Error::other("Lexer is immutable.")) } else {
             Ok(&mut self.contents)
         }
     }

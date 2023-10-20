@@ -3,10 +3,10 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::path::Path;
-use crate::{Analyser, Lexer, LexicalError};
+use crate::{Analyser, Lexer};
 
 pub trait LexicalPreProcessor {
-    type E: Error + From<LexicalError>;
+    type E: Error;
 
     fn process_from_start_and_return(&mut self, lexer: &mut Lexer) -> Result<(), Self::E>{
         let previous = lexer.reset();
@@ -24,22 +24,14 @@ pub trait LexicalPreProcessor {
 }
 
 
-pub trait Parseable: Sized where Self::P: LexicalPreProcessor<E = Self::E> {
-    type E: Error + From<LexicalError> + From<io::Error>;
-    type P: LexicalPreProcessor;
+pub trait Parser: Sized {
+    type E: Error;
 
-    fn parse_virtual_file<_P: AsRef<Path>>(path: _P, preprocessor: Option<&mut Self::P>) -> Result<Self, Self::E> {
+    fn parse_virtual_file<P: AsRef<Path>>(path: P, preprocessor: Option<&mut dyn LexicalPreProcessor<E=Self::E>>) -> Result<Self, Self::E> {
         todo!("rv::vfs")
     }
 
-    fn parse_system_file<_P: AsRef<Path>>(path: _P, preprocessor: Option<&mut Self::P>) -> Result<Self, Self::E> {
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        Self::parse_data(&buffer, preprocessor)
-    }
-
-    fn parse_data<B: AsRef<[u8]>>(content: B, preprocessor: Option<&mut Self::P>) -> Result<Self, Self::E> {
+    fn parse_data<B: AsRef<[u8]>>(content: B, preprocessor: Option<&mut dyn LexicalPreProcessor<E=Self::E>>) -> Result<Self, Self::E> {
         let mut lexer = Lexer::new(content, true);
         return match preprocessor {
             None => Self::try_parse(&mut lexer),
@@ -49,7 +41,7 @@ pub trait Parseable: Sized where Self::P: LexicalPreProcessor<E = Self::E> {
 
     fn parse(mut lexer: Lexer) -> Self { Self::try_parse(&mut lexer).unwrap() }
 
-    fn try_process_parse(mut lexer: Lexer, preprocessor: &mut Self::P) -> Result<Self, Self::E>{
+    fn try_process_parse(mut lexer: Lexer, preprocessor: &mut dyn LexicalPreProcessor<E=Self::E>) -> Result<Self, Self::E>{
         preprocessor.process_from_current_and_return(&mut lexer)?;
         Self::try_parse(&mut lexer)
     }

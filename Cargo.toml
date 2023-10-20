@@ -13,8 +13,13 @@ byteorder = "1.4.3"
 io-streams = "0.15.0"
 async-std = "1.12.0"
 env_logger = { version = "0.10.0", features = [] }
+quote = "1.0.33"
+syn = "2.0.38"
+proc-macro2 = "1.0.69"
 
 [lib]
 crate-type = ["cdylib"]
+proc-macro = true
+
 [profile.release]
 opt-level = 3

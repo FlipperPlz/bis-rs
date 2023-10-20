@@ -8,23 +8,23 @@ use byteorder::WriteBytesExt;
 use vfs::FileSystem;
 use crate::{Lexer, LexicalPreProcessor};
 
-type PreprocessorResult<O> = Result<O, PreprocessError>;
+type PreprocessorResult<O> = Result<O, RvPreprocessError>;
 type PreprocessorVoidResult = PreprocessorResult<()>;
 
-struct Preprocessor {
+pub struct RvPreprocessor {
     filesystem: Box<dyn FileSystem>,
     macros:     HashMap<MacroName, Macro>
 }
 
-impl LexicalPreProcessor for Preprocessor {
-    type E = PreprocessError;
+impl LexicalPreProcessor for RvPreprocessor {
+    type E = RvPreprocessError;
 
     fn process(&mut self, lexer: &mut Lexer) -> Result<(), Self::E> {
         todo!()
     }
 }
 
-impl Preprocessor {
+impl RvPreprocessor {
     pub fn process_path<I: Read + Seek, O: Write>(&mut self,
       output: &mut Option<&mut O>,
       path: String
@@ -97,10 +97,10 @@ impl Preprocessor {
       current_line: &mut u32,
       output: &mut Option<&mut O>
     ) -> PreprocessorVoidResult {
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         reader.skip_whitespace()?;
         if let None = output {
-            return Err(PreprocessError::InvalidToken {
+            return Err(RvPreprocessError::InvalidToken {
                 line: *current_line,
                 token: current_token.clone()
             })
@@ -112,13 +112,13 @@ impl Preprocessor {
             LexToken::IfDef => self.consume_if_block(current_path, reader, text_buffer, true, output, current_token, current_line),
             LexToken::IfNDef =>  self.consume_if_block(current_path, reader, text_buffer, false, output, current_token, current_line),
             LexToken::Undef => self.consume_undefine_directive::<I,O>(reader, text_buffer, current_token, current_line),
-            LexToken::Else => Err(PreprocessError::WierdElse(*current_line)),
-            LexToken::EndIf => Err(PreprocessError::WierdEndif(*current_line)),
-            LexToken::Unknown => Err(PreprocessError::InvalidDirective {
+            LexToken::Else => Err(RvPreprocessError::WierdElse(*current_line)),
+            LexToken::EndIf => Err(RvPreprocessError::WierdEndif(*current_line)),
+            LexToken::Unknown => Err(RvPreprocessError::InvalidDirective {
                 line: *current_line,
                 directive_text: text_buffer.clone()
             }),
-            _ => Err(PreprocessError::InvalidToken {
+            _ => Err(RvPreprocessError::InvalidToken {
                 line: *current_line,
                 token: current_token.clone()
             }),
@@ -143,17 +143,17 @@ impl Preprocessor {
         if match current_token {
             LexToken::DQuote => Ok(reader.scan_string(text_buffer, 127, CONST_DOUBLE_QUOTE)?),
             LexToken::LeftAngle => Ok(reader.scan_string(text_buffer, 127, CONST_RIGHT_ANGLE)?),
-            _ => Err(PreprocessError::InvalidToken {
+            _ => Err(RvPreprocessError::InvalidToken {
                 line: current_line.clone(),
                 token: current_token.clone()
             })
         }? > 0 {
             self.follow_include::<I, O>(output, text_buffer)?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
             return Ok(());
         }
 
-        Err(PreprocessError::EmptyInclude(*current_line))
+        Err(RvPreprocessError::EmptyInclude(*current_line))
     }
 
     fn consume_define_directive<I: Read + Seek, O: Write>(&mut self,
@@ -163,18 +163,18 @@ impl Preprocessor {
       current_token: &mut LexToken,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         let name = text_buffer.clone();
         let macro_arguments = self.consume_macro_arguments::<I, O>(reader, text_buffer, current_token)?;
         if *current_token != LexToken::RightParenthesis {
-            return Err(PreprocessError::InvalidToken { line: *current_line, token: current_token.clone() })
+            return Err(RvPreprocessError::InvalidToken { line: *current_line, token: current_token.clone() })
         } else {
             reader.skip_whitespace()?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         }
         if text_buffer.chars().next().unwrap_or(' ') == ' ' {
             reader.skip_whitespace()?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         }
         let macro_value = self.consume_macro_value::<I, O>(reader, output, text_buffer, current_token, current_line)?;
 
@@ -216,16 +216,16 @@ impl Preprocessor {
       current_token: &mut LexToken,
     ) -> PreprocessorResult<Vec<String>> {
         let mut arguments: Vec<String> = Vec::new();
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         if *current_token == LexToken::LeftParenthesis {
             reader.skip_whitespace()?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
             while let LexToken::Text = current_token.clone() {
                 arguments.push(text_buffer.clone());
                 reader.skip_whitespace()?;
-                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                 if *current_token == LexToken::Comma {
-                    *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                    *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                 }
             }
         }
@@ -249,7 +249,7 @@ impl Preprocessor {
                 _ => {value += text_buffer;}
             }
 
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         }
         Ok(value)
     }
@@ -281,14 +281,14 @@ impl Preprocessor {
       current_token: &mut LexToken,
       current_line: &mut u32
     ) -> PreprocessorVoidResult {
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         return match current_token {
             LexToken::Text => {
                 self.remove_macro(text_buffer)?;
 
-                Ok(*current_token = Preprocessor::get_next(reader, text_buffer)?)
+                Ok(*current_token = RvPreprocessor::get_next(reader, text_buffer)?)
             },
-            _ => Err(PreprocessError::InvalidToken {
+            _ => Err(RvPreprocessError::InvalidToken {
                 line: current_line.clone(),
                 token: current_token.clone()
             })
@@ -306,9 +306,9 @@ impl Preprocessor {
     ) -> PreprocessorVoidResult {
         let null_output: &mut Option<&mut O> = &mut None;
         let if_start = current_line.clone();
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         if *current_token != LexToken::RightParenthesis {
-            return Err(PreprocessError::InvalidToken {
+            return Err(RvPreprocessError::InvalidToken {
                 line: *current_line,
                 token: current_token.clone()
             })
@@ -317,7 +317,7 @@ impl Preprocessor {
             None => if negated { true } else { false },
             Some(_) => if negated { false } else { true }
         };
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         let mut found_else = false;
         loop {
             match self.global_scan(
@@ -329,20 +329,20 @@ impl Preprocessor {
                 text_buffer
             ).err() {
                 None => {
-                    return Err(PreprocessError::MissingEndIf(if_start))
+                    return Err(RvPreprocessError::MissingEndIf(if_start))
                 }
                 Some(e) => {
                     match e {
-                        PreprocessError::WierdEndif(_) => {
-                            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                        RvPreprocessError::WierdEndif(_) => {
+                            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                             break
                         }
-                        PreprocessError::WierdElse(_) => {
+                        RvPreprocessError::WierdElse(_) => {
                             if found_else {
-                                return Err(PreprocessError::MultipleElseDirectives(if_start))
+                                return Err(RvPreprocessError::MultipleElseDirectives(if_start))
                             }
                             found_else = true;
-                            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                             self.global_scan(
                                 current_path,
                                 reader,
@@ -383,20 +383,20 @@ impl Preprocessor {
         let macro_name = text_buffer.clone();
         return if *text_buffer == "__FILE__"  {
             output.write(format!("\"{}\"", current_path).as_bytes())?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
             Ok(true)
         } else if *text_buffer == "__LINE__" {
             output.write(format!("\"{}\"", current_line).as_bytes())?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
             Ok(true)
         } else if let Some(found_macro) = self.find_macro(text_buffer) {
             if !found_macro.takes_params() {
                 output.write(found_macro.get_value().as_bytes())?;
-                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                 Ok(true)
             } else if found_macro.blocked() {
                 output.write(found_macro.get_value().as_bytes())?;
-                *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                 Ok(false)
             } else {
                 let arguments = self.read_macro_parameters(macro_name, found_macro, current_path, text_buffer, current_token, current_line, reader);
@@ -406,7 +406,7 @@ impl Preprocessor {
             }
         } else {
             output.write(text_buffer.as_bytes())?;
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
             Ok(false)
         }
 
@@ -421,11 +421,11 @@ impl Preprocessor {
         current_line: &mut u32,
         reader: &mut PreprocessorReader<I>,
     ) -> PreprocessorResult<Vec<String>> {
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         let mut parameters = Vec::new();
         let max = macro_obj.parameter_count();
         if *current_token != LexToken::LeftParenthesis {
-            return Err(PreprocessError::from(
+            return Err(RvPreprocessError::from(
                 MacroError::InvalidParameterCount(
                     macro_name,
                     0,
@@ -437,7 +437,7 @@ impl Preprocessor {
             let should_end = self.read_macro_parameter(current_path, text_buffer, current_token, current_line, reader)?;
             parameters.push(text_buffer.clone());
             if parameters.len() > max {
-                return Err(PreprocessError::from(
+                return Err(RvPreprocessError::from(
                     MacroError::InvalidParameterCount(
                         macro_name,
                         parameters.len(),
@@ -461,7 +461,7 @@ impl Preprocessor {
         let mut parameter = String::new();
         let mut parenthesis_count = 0;
         let mut quoted = false;
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         loop {
             match current_token {
                 LexToken::LeftParenthesis => {
@@ -483,7 +483,7 @@ impl Preprocessor {
                 }
                 LexToken::Comma => {
                     if parenthesis_count == 0 && !quoted {
-                        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+                        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
                         *text_buffer = parameter;
                         return Ok(false);
                     }
@@ -500,7 +500,7 @@ impl Preprocessor {
                 }
                 _ => parameter += text_buffer,
             }
-            *current_token = Preprocessor::get_next(reader, text_buffer)?;
+            *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
 
         }
     }
@@ -520,7 +520,7 @@ impl Preprocessor {
         if let Some(ref mut out) = output {
             out.write(&*(text_buffer.clone()).into_bytes())?;
         }
-        *current_token = Preprocessor::get_next(reader, text_buffer)?;
+        *current_token = RvPreprocessor::get_next(reader, text_buffer)?;
         Ok(())
     }
 

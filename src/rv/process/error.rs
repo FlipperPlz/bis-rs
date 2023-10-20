@@ -1,13 +1,11 @@
 use std::io::Error;
 use thiserror::Error;
-use crate::{LexicalError, LexToken};
+use crate::{LexToken};
 
 #[derive(Error, Debug)]
-pub enum PreprocessError {
+pub enum RvPreprocessError {
     #[error(transparent)]
     IO(#[from] Error),
-    #[error(transparent)]
-    LexicalError(#[from] LexicalError),
     #[error(transparent)]
     Macro(#[from] MacroError),
     #[error("[{line}] Invalid preprocessor directive \"{directive_text}\"")]
@@ -52,7 +50,7 @@ pub enum MacroError {
 
 macro_rules! invalid_directive {
     ($current_line:ident, $directive_text:ident) => {
-        Err(PreprocessError::InvalidDirective {
+        Err(RvPreprocessError::InvalidDirective {
             line: $current_line,
             directive_text: $directive_text
         });
