@@ -115,6 +115,10 @@ pub trait Analyser<T: Sized + PartialEq + Clone> {
         }
         true
     }
+    fn step_back(&mut self) -> Option<T> {
+        self.set_cursor(self.pos() - 1);
+        self.peek()
+    }
 }
 
 pub trait MutAnalyser<T: Sized + PartialEq + Clone>: Analyser<T> {
