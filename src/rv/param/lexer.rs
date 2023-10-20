@@ -102,7 +102,7 @@ impl ScopedTokenizer for ParamLexer {
     type Error = ParamLexerError;
     type Scope = ParamLexicalScope;
 
-    fn next_token(&mut self, scope: Self::Scope) -> LexerResult<Self::Token> {
+    fn next_token(&mut self, scope: &Self::Scope) -> LexerResult<Self::Token> {
         return match scope {
             ParamLexicalScope::Statement => self.next_statement(),
             ParamLexicalScope::Expression => self.next_expression(),
@@ -118,7 +118,7 @@ fn is_alpha(c: &u8) -> bool { matches!(c, b'a'..=b'z' | b'A'..=b'Z') }
 impl ParamToken {
     pub fn or_else_identifier(self) -> Self {
         match self {
-            ParamToken::Unknown(it) if !is_numeric(it.first().unwrap())  => ParamToken::Identifier(it),
+            ParamToken::Unknown(it) if it.len() > 0 && !is_numeric(it.first().unwrap())  => ParamToken::Identifier(it),
             _ => self,
         }
     }

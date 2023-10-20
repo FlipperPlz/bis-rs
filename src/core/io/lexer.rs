@@ -30,7 +30,7 @@ pub trait ScopedTokenizer {
     type Error: Error;
     type Scope;
 
-    fn next_token(&mut self, scope: Self::Scope) -> Result<Self::Token, Self::Error>;
+    fn next_token(&mut self, scope: &Self::Scope) -> Result<Self::Token, Self::Error>;
 }
 
 impl<Tok: ScopedTokenizer<Scope = S>, S: Default> Tokenizer for Tok {
@@ -38,7 +38,7 @@ impl<Tok: ScopedTokenizer<Scope = S>, S: Default> Tokenizer for Tok {
     type Error = Tok::Error;
 
     fn next_token(&mut self) -> Result<Self::Token, Self::Error> {
-        self.next_token(S::default())
+        self.next_token(&S::default())
     }
 }
 
