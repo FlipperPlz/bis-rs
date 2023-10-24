@@ -23,7 +23,7 @@ pub enum ParamLexicalScope {
 
 pub enum ParamToken {
     ClassKeyword, DeleteKeyword, EnumKeyword,
-    SemiColon, Colon, Comma, Ampersand,
+    SemiColon, Colon, Comma, Ampersand, EOF,
     LeftSquare, RightSquare, LeftCurly, RightCurly,
     Assign, AddAssign, SubAssign, LineDirective,
     Identifier(Vec<u8>),

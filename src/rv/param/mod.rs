@@ -1,65 +1,79 @@
 pub mod lexer;
 
-use std::collections::HashMap;
 use std::hash::Hash;
+use std::ops;
 pub use lexer::*;
 pub mod parser; pub use parser::*;
 
-type StatementId = u32;
-type ConstantId = u32;
-type ContextId = u32;
-type ExpressionId = u32;
-
-type StatementGroup = Box<Vec<StatementId>>;
-type ExpressionGroup = Box<Vec<ExpressionId>>;
-
-const FILE_ROOT: ContextId = 0;
-
-pub struct ParamConstant {
-    name:             String,
-    value:            f32
-}
+type NodeSet = Vec<ParamStatement>;
+type ValueSet = Vec<ParamExpression>;
 
 pub struct ParamFile {
-    statements:       HashMap<StatementId, ParamStatement>,
-    constants:        HashMap<ConstantId, ParamConstant>,
-    contexts:         HashMap<ContextId, StatementGroup>,
-    expressions:      HashMap<ExpressionId, ParamExpression>,
-    name:             String,
+    name:               Vec<u8>,
+    nodes:              NodeSet
 }
 
-pub enum ParamClassStatement {
-    External(String),
-    Normal {
-        name:         String,
-        super_class:  String,
-        context_id:   ContextId
-    }
+#[derive(PartialEq)]
+pub struct ParamClass {
+    name:               Vec<u8>,
+    super_name:         Vec<u8>,
+    nodes:              NodeSet
 }
 
+#[derive(PartialEq)]
 pub enum ParamStatement {
-    Class(ParamClassStatement),
-    Delete(String),
-    Variable(String, ParamExpression)
+    ExternalClass(Vec<u8>),
+    Class(ParamClass),
+    Delete(Vec<u8>),
+    Variable(Vec<u8>, ParamExpression)
 }
 
+#[derive(PartialEq)]
 pub enum ParamExpression {
-    Literal(ParamLiteral),
-    Array(ExpressionGroup)
+    Atomic(ParamLiteral),
+    Array(ValueSet)
 }
 
+#[derive(PartialEq)]
 pub enum ParamLiteral {
-    String(bool, String),
-    Expression(ConstantId),
+    String(bool, Vec<u8>),
     Float(f32),
     Integer(i32),
     Long(i64)
 }
 
+impl ParamContext for ParamClass {
+    fn name(&self) -> &Vec<u8> { &self.name }
+
+    fn nodes(&self) -> &NodeSet { &self.nodes }
+
+    fn mut_nodes(&mut self) -> &mut NodeSet { &mut self.nodes }
+}
+
+trait ParamContext {
+    fn name(&self) -> &String;
+
+    fn nodes(&self) -> &NodeSet;
+
+    fn mut_nodes(&mut self) -> &mut NodeSet;
+
+    fn add_node(&mut self, node: ParamStatement) { self.mut_nodes().push(node); }
+
+    fn remove_node(&mut self, index: usize) { self.mut_nodes().remove(index); }
+
+    fn edit_node(&mut self, index: usize) -> Option<&mut ParamStatement> { self.mut_nodes().get_mut(index) }
+
+    fn get_node(&self, index: usize) -> Option<&ParamStatement> {
+        match self.nodes().get(index) {
+            Some(node) => Some(node),
+            None => None,
+        }
+    }
+}
+
+
 
 impl ParamFile {
 
-    pub fn create(filename: String) -> Self {
-        todo!()
-    }
+
 }
