@@ -207,6 +207,14 @@ fn is_numeric(c: &u8) -> bool { matches!(c, b'0'..=b'9') }
 fn is_alpha(c: &u8) -> bool { matches!(c, b'a'..=b'z' | b'A'..=b'Z') }
 
 impl ParamToken {
+
+    pub fn identifier_or_err<F: FnOnce(&ParamToken) -> F>(&self, failure: F) -> Result<&Vec<u8>, F> {
+        match self {
+            ParamToken::Identifier(it) => Ok(it),
+            t => Err(failure(t))
+        }
+    }
+
     pub fn or_else_identifier(self) -> Self {
         match self {
             ParamToken::Unknown(it) if it.len() > 0 && !is_numeric(it.first().unwrap())  => ParamToken::Identifier(it),
