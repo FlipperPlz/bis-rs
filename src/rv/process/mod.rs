@@ -1,3 +1,4 @@
+pub mod lexer;
 pub mod io; pub use io::*;
 pub mod error; pub use error::*;
 pub mod define; pub use define::*;
@@ -6,7 +7,6 @@ use std::hash::Hash;
 use std::io::{Cursor, Error, Read, Seek, Write};
 use byteorder::WriteBytesExt;
 use vfs::FileSystem;
-use crate::{Lexer, LexicalPreProcessor};
 
 type PreprocessorResult<O> = Result<O, RvPreprocessError>;
 type PreprocessorVoidResult = PreprocessorResult<()>;
@@ -16,13 +16,6 @@ pub struct RvPreprocessor {
     macros:     HashMap<MacroName, Macro>
 }
 
-impl LexicalPreProcessor for RvPreprocessor {
-    type E = RvPreprocessError;
-
-    fn process(&mut self, lexer: &mut Lexer) -> Result<(), Self::E> {
-        todo!()
-    }
-}
 
 impl RvPreprocessor {
     pub fn process_path<I: Read + Seek, O: Write>(&mut self,

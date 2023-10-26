@@ -1,0 +1,3 @@
+[submodule "lib/bex"]
+	path = lib/bex
+	url = https://github.com/FlipperPlz/BexRs/

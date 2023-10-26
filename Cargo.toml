@@ -1,25 +1,20 @@
 [package]
-name = "bis_enf"
+name = "bis"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-vfs = "0.9.0"
+vfs = "0.10.0"
 log = "0.4.20"
 thiserror = "1.0.49"
 byteorder = "1.4.3"
 io-streams = "0.15.0"
-async-std = "1.12.0"
-env_logger = { version = "0.10.0", features = [] }
-quote = "1.0.33"
-syn = "2.0.38"
-proc-macro2 = "1.0.69"
+bex = { path = "lib/bex"}
 
 [lib]
 crate-type = ["cdylib"]
-proc-macro = true
 
 [profile.release]
 opt-level = 3
