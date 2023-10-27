@@ -7,22 +7,11 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(param): Work On Enum Parsing">
-      <change afterPath="$PROJECT_DIR$/.gitmodules" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/lib/bex" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/rv/process/lexer.rs" afterDir="false" />
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(param): Start Work On Porting Lexers To Bex">
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/io/analysis.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/io/lexer.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/io/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/io/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/io/parser.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/bank/fs/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/bank/fs/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/param/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/param/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/param/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/parser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/bex/src/read.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/read.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/lexer.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -64,23 +53,23 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Cargo.build.executor": "Run",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "bex",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs": "true",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.build.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;bex&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs&quot;: &quot;true&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
@@ -113,7 +102,9 @@
       <workItem from="1698267884028" duration="174000" />
       <workItem from="1698268065459" duration="3601000" />
       <workItem from="1698272704172" duration="3413000" />
-      <workItem from="1698283168763" duration="5282000" />
+      <workItem from="1698283168763" duration="7348000" />
+      <workItem from="1698343188994" duration="193000" />
+      <workItem from="1698343403803" duration="8700000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />
@@ -283,7 +274,15 @@
       <option name="project" value="LOCAL" />
       <updated>1698182451990</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="feat(param): Start Work On Porting Lexers To Bex">
+      <option name="closed" value="true" />
+      <created>1698288784991</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1698288784991</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -311,6 +310,7 @@
     <MESSAGE value="feat(param): Start Working On Parser" />
     <MESSAGE value="feat(param): More Misc Parser Work" />
     <MESSAGE value="feat(param): More Misc Parser Work. Finish Class Reading &amp; Context Management" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(param): More Misc Parser Work. Finish Class Reading &amp; Context Management" />
+    <MESSAGE value="feat(param): Start Work On Porting Lexers To Bex" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(param): Start Work On Porting Lexers To Bex" />
   </component>
 </project>
