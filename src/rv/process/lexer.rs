@@ -9,11 +9,12 @@ type LexerResult<T> = Result<T, ProcLexicalError>;
 pub enum ProcLexicalError {
     #[error(transparent)]
     IO(#[from] io::Error),
+    #[error("Unknown Directive Encountered")]
+    UnknownDirective(Vec<u8>)
 }
 
 pub struct ProcLexicalScope {
     line_number: u32,
-    defines:     Vec<ProcMacro>,
     quoted:      bool
 }
 
@@ -28,15 +29,20 @@ pub struct ProcMacro {
 }
 
 pub struct ProcIfBlock {
-    target:  Vec<u8>,
-    if_section: Vec<u8>,
+    negated:      bool,
+    target:       Vec<u8>,
+    if_section:   Vec<u8>,
     else_section: Option<Vec<u8>>
 }
 
+pub struct ProcInclude {
+    using_angles: bool,
+    path:         Vec<u8>
+}
+
 pub enum ProcLexicalToken {
-    Include(Vec<u8>), Define(ProcMacro),
-    IfDef(ProcIfBlock), IfNDef(ProcIfBlock),
-    Identifier(Vec<u8>), Text(Vec<u8>), Unknown(Vec<u8>),
+    Include(ProcInclude), Define(ProcMacro), IfBlock(ProcIfBlock),
+    Undefine(Vec<u8>), Identifier(Vec<u8>), Text(Vec<u8>), Unknown(Vec<u8>),
     LineBreak, Comment
 }
 
@@ -51,7 +57,7 @@ impl ScopedToken<u8> for ProcLexicalToken {
     ) -> Result<Self, Self::Error> {
         if scope.quoted {
             let text = ProcLexicalToken::Text(std::iter::once(b'"').chain(lexer.get_until(b'\"').into_iter()).chain(std::iter::once(b'"')).collect());
-            lexer.step_forward()?;
+            scope.quoted = false; lexer.step_forward()?;
             return Ok(text)
         }
 
@@ -61,7 +67,7 @@ impl ScopedToken<u8> for ProcLexicalToken {
         }
 
         return match current {
-            b'#' if !scope.quoted => {
+            b'#' => {
                 if lexer.take(&b'#') { read_macro(lexer, scope) }
                 else { next_directive(lexer, scope) }
             }
@@ -69,15 +75,38 @@ impl ScopedToken<u8> for ProcLexicalToken {
                 scope.quoted = true;
                 Self::next_token(lexer, scope);
             }
-            b'/' if !scope.quoted => {
-                if lexer.take(&b'/') { read_line_comment(lexer, scope) }
-                else if lexer.take(&b'*') { read_delimited_comment(lexer, scope)}
+            b'/' => {
+                current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
+                if current == b'/' { read_line_comment(lexer, scope) }
+                else if current == b'*' { read_delimited_comment(lexer, scope)}
                 else { Ok(ProcLexicalToken::Unknown(Vec::from(b'/'))) }
+            }
+            b'\\' => {
+                current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
+                if current == b'\n' {
+                    return Ok(ProcLexicalToken::LineBreak)
+                }
+                return Ok(ProcLexicalToken::Text(vec![b'\\', current]))
             }
             content => Ok(ProcLexicalToken::Unknown(Vec::from(content)))
         }
     }
 }
+
+fn next_directive(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    match get_name(lexer, &mut scope.line_number, None, 128)?.as_slice() {
+        b"include" => read_include(lexer, scope),
+        b"define" => read_define(lexer, scope),
+        b"ifdef" => read_if(lexer, scope, false),
+        b"ifndef" => read_if(lexer, scope, true),
+        b"undef" => read_undefine(lexer, scope),
+        directive => Err(ProcLexicalError::UnknownDirective(Vec::from(directive)))
+    }
+}
+
 
 fn read_delimited_comment(
     lexer: &mut Lexer<u8>,
@@ -116,12 +145,34 @@ fn read_macro(
     todo!()
 }
 
-fn next_directive(
+fn read_define(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
 ) -> LexerResult<ProcLexicalToken> {
     todo!()
+}
 
+fn read_include(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    todo!()
+}
+
+fn read_if(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope,
+    negated: bool
+) -> LexerResult<ProcLexicalToken> {
+    todo!()
+}
+
+
+fn read_undefine(
+    lexer: &mut Lexer<u8>,
+    p1: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    todo!()
 }
 
 fn get_stripped(

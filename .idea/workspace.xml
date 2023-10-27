@@ -7,10 +7,8 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Start Work On PreProcessor Rewrite">
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Finish Up ScopedToken&lt;u8&gt;::next_token for ProcLexicalToken">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex/src/read.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/read.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/lexer.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -104,7 +102,7 @@
       <workItem from="1698283168763" duration="7348000" />
       <workItem from="1698343188994" duration="193000" />
       <workItem from="1698343403803" duration="9064000" />
-      <workItem from="1698371898069" duration="3327000" />
+      <workItem from="1698371898069" duration="5347000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />
@@ -290,7 +288,15 @@
       <option name="project" value="LOCAL" />
       <updated>1698370923541</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="feat(preproc): Finish Up ScopedToken&lt;u8&gt;::next_token for ProcLexicalToken">
+      <option name="closed" value="true" />
+      <created>1698375284876</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1698375284876</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -320,6 +326,7 @@
     <MESSAGE value="feat(param): More Misc Parser Work. Finish Class Reading &amp; Context Management" />
     <MESSAGE value="feat(param): Start Work On Porting Lexers To Bex" />
     <MESSAGE value="feat(preproc): Start Work On PreProcessor Rewrite" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Start Work On PreProcessor Rewrite" />
+    <MESSAGE value="feat(preproc): Finish Up ScopedToken&lt;u8&gt;::next_token for ProcLexicalToken" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Finish Up ScopedToken&lt;u8&gt;::next_token for ProcLexicalToken" />
   </component>
 </project>
