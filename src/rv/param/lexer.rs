@@ -151,7 +151,7 @@ pub fn take_string(lexer: &mut Lexer<u8>, terminators: &[u8]) -> LexerResult<Par
         data,
     })
 }
-pub fn skip_space(lexer: &mut Lexer<u8>) -> LexerResult<u8> {
+fn skip_space(lexer: &mut Lexer<u8>) -> LexerResult<u8> {
     let mut current = *lexer.peek()?;
     while is_space(&current) {
         current = lexer.get()?;

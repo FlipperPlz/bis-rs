@@ -10,7 +10,13 @@ pub enum ProcLexicalError {
     #[error(transparent)]
     IO(#[from] io::Error),
     #[error("Unknown Directive Encountered")]
-    UnknownDirective(Vec<u8>)
+    UnknownDirective(Vec<u8>),
+    #[error("Missing Space In Directive Body")]
+    MissingSpace,
+    #[error("Expected Text token, instead got {0}.")]
+    ExpectedText(ProcLexicalToken),
+    #[error("Expected {2}, instead got {1}.")]
+    UnexpectedChar(char, [char])
 }
 
 pub struct ProcLexicalScope {
@@ -102,9 +108,91 @@ fn next_directive(
         b"define" => read_define(lexer, scope),
         b"ifdef" => read_if(lexer, scope, false),
         b"ifndef" => read_if(lexer, scope, true),
-        b"undef" => read_undefine(lexer, scope),
+        b"undef" => read_undefine(lexer),
         directive => Err(ProcLexicalError::UnknownDirective(Vec::from(directive)))
     }
+}
+
+
+fn skip_space(lexer: &mut Lexer<u8>) -> LexerResult<bool> {
+    let mut found_space = false;
+    loop {
+        let current = *lexer.peek()?;
+        if current < 33 && current != b'\n' {
+            found_space = true;
+            lexer.step_forward()?
+        } else { break }
+    }
+    Ok(found_space)
+}
+
+fn read_macro(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    todo!()
+}
+
+fn read_define(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    todo!()
+}
+
+fn read_if(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope,
+    negated: bool
+) -> LexerResult<ProcLexicalToken> {
+    if !skip_space(lexer) {
+        return Err(ProcLexicalError::MissingSpace)
+    }
+    todo!()
+}
+
+
+fn read_include(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcLexicalToken> {
+    if !skip_space(lexer) {
+        return Err(ProcLexicalError::MissingSpace)
+    }
+    let angled = match *get_stripped(lexer, &mut scope.line_number) {
+        b'<' => true,
+        b'"' => false,
+        tok => return Err(ProcLexicalError::UnexpectedChar(tok, *['<', '"']))
+    };
+    let path = get_string(
+        lexer,
+        &mut scope.line_number,
+        None,
+    128,
+        if angled {
+            b">"
+        } else {
+            b"\""
+        }
+    )?;
+    return Ok(ProcLexicalToken::Include(ProcInclude {
+        using_angles: angled,
+        path
+    }));
+}
+
+fn read_undefine(
+    lexer: &mut Lexer<u8>
+) -> LexerResult<ProcLexicalToken> {
+    if !skip_space(lexer) {
+        return Err(ProcLexicalError::MissingSpace)
+    }
+    let macro_name = match ProcLexicalToken::next_token(lexer) {
+        ProcLexicalToken::Text(it) => it,
+        tok => return Err(ProcLexicalError::ExpectedText(tok))
+    };
+
+    return Ok(ProcLexicalToken::Undefine(macro_name));
 }
 
 
@@ -136,43 +224,6 @@ fn read_line_comment(
     scope.line_number += 1;
 
     return Ok(ProcLexicalToken::Comment)
-}
-
-fn read_macro(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
-    todo!()
-}
-
-fn read_define(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
-    todo!()
-}
-
-fn read_include(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
-    todo!()
-}
-
-fn read_if(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope,
-    negated: bool
-) -> LexerResult<ProcLexicalToken> {
-    todo!()
-}
-
-
-fn read_undefine(
-    lexer: &mut Lexer<u8>,
-    p1: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
-    todo!()
 }
 
 fn get_stripped(
@@ -257,7 +308,7 @@ fn get_name(
 pub fn valid_id_char(char: u8, is_first: bool) -> bool {
     (!is_first && (
         char >= b'0' ||
-            char <= b'9')
+        char <= b'9')
     ) ||
         char >= b'a' ||
         char <= b'z' ||
@@ -265,4 +316,3 @@ pub fn valid_id_char(char: u8, is_first: bool) -> bool {
         char <= b'Z' ||
         char == b'_'
 }
-
