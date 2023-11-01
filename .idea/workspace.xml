@@ -7,14 +7,23 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Finish Up Include, Undefine, And Comments">
+    <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Start Work On Parser">
+      <change afterPath="$PROJECT_DIR$/src/rv/bank/io.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/rv/bank/path.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/bex" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex/src/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex/src/process.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/process.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/bex/src/read.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/read.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/io/encryption.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/io/error.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/io/mod.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/io/options.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/bank/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/utils/mod.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/bank/utils/path.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/lexer.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/process.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/process.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/vfs/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/vfs/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -75,6 +84,11 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="E:\projects\rust\bis-rs\src\rv\bank" />
+    </key>
+  </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
@@ -119,7 +133,7 @@
       <workItem from="1698840455594" duration="111000" />
       <workItem from="1698840580482" duration="76000" />
       <workItem from="1698840693005" duration="2348000" />
-      <workItem from="1698843246152" duration="9630000" />
+      <workItem from="1698843246152" duration="13998000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />
@@ -329,14 +343,21 @@
       <option name="project" value="LOCAL" />
       <updated>1698793515455</updated>
     </task>
-    <option name="localTasksCounter" value="27" />
+    <task id="LOCAL-00027" summary="feat(preproc): Start Work On Parser">
+      <option name="closed" value="true" />
+      <created>1698853735435</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1698853735435</updated>
+    </task>
+    <option name="localTasksCounter" value="28" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="feat(preproc): Add Some Token Support :)" />
     <MESSAGE value="feat(preproc): Start Work On Actual Preprocessor" />
     <MESSAGE value="feat(preproc): Implement Include Directive" />
     <MESSAGE value="feat(preproc): Implement Macro/Define Structure" />
@@ -361,6 +382,7 @@
     <MESSAGE value="feat(preproc): Finish Up ScopedToken&lt;u8&gt;::next_token for ProcLexicalToken" />
     <MESSAGE value="feat(preproc): Start Working On Directives" />
     <MESSAGE value="feat(preproc): Finish Up Include, Undefine, And Comments" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Finish Up Include, Undefine, And Comments" />
+    <MESSAGE value="feat(preproc): Start Work On Parser" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat(preproc): Start Work On Parser" />
   </component>
 </project>

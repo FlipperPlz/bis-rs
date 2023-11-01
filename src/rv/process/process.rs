@@ -1,7 +1,8 @@
 use std::io;
 use bex::{Lexer, PreProcess};
 use thiserror::Error;
-use crate::{lexer, ProcInclude, ProcMacro, ProcToken};
+use crate::process::lexer::{ProcMacro, ProcToken, ProcError, ProcInclude};
+
 type PreprocessorResult<T> = Result<T, PreprocessorError>;
 
 pub struct RvPreprocessor {
@@ -12,7 +13,7 @@ pub enum PreprocessorError {
     #[error(transparent)]
     IO(#[from] io::Error),
     #[error(transparent)]
-    Lexer(#[from] lexer::ProcError)
+    Lexer(#[from] ProcError)
 }
 
 impl RvPreprocessor {
@@ -66,32 +67,33 @@ impl PreProcess<u8> for RvPreprocessor {
                 None => break,
                 Some(it) => it
             } {
-                ProcToken::Include(include) => self.process_include(include),
-                ProcToken::Define(it) => self.define(it),
-                ProcToken::IfBlock(block) => if block.negated ^ self.defined(&block.target) {
+                ProcToken::Include(include) => document.extend(self.process_include(include)?),
+                ProcToken::Define(it) => self.define(it)?,
+                ProcToken::IfBlock(block) => if block.negated ^ self.defined(&block.target)? {
                     document.extend(block.if_section)
                 } else if let Some(text) = block.else_section {
                     document.extend(text)
                 },
-                ProcToken::Undefine(it) => self.undefine(&it)?,
+                ProcToken::Undefine(it) => _ = self.undefine(&it)?,
                 ProcToken::Identifier(id) => match self.try_expand_macro(&id, &mut contents)? {
                     None => { document.extend(id); }
                     Some(expanded) => document.extend(expanded)
                 }
                 ProcToken::Unknown(text) => document.extend(text),
-                ProcToken::DoubleHash => match contents.last() {
+                ProcToken::DoubleHash => match contents.pop() {
                     None => document.extend_from_slice(&[b'#', b'#']),
-                    Some(tok) => match tok {
-                        ProcToken::Identifier(text) => {
-                            match self.try_expand_macro(text, &mut contents)? {
-                                None => {
-                                    document.extend_from_slice(&[b'#', b'#']);
-                                    document.extend(text);
+                    Some(tok) => {
+                        match &tok {
+                            ProcToken::Identifier(text) => {
+                                match self.try_expand_macro(text, &mut contents)? {
+                                    None => {}
+                                    Some(expanded) => document.extend(expanded)
                                 }
-                                Some(expanded) => document.extend(expanded)
                             }
-                        },
-                        _ => {document.extend_from_slice(&[b'#', b'#'])}
+                            _ => {}
+                        }
+                        document.extend_from_slice(&[b'#', b'#']);
+                        contents.push(tok)
                     }
                 }
                 ProcToken::NewLine => document.push(b'\n'),

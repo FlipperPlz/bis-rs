@@ -90,11 +90,12 @@ impl ScopedToken<u8> for ProcToken {
         scope: &mut ProcScope
     ) -> Result<Self, Self::Error> {
         let token = match scope.quoted {
-            true => ProcToken::Text(std::iter::once(b'"').chain(lexer.get_until(b'"')).chain(std::iter::once(b'"')).collect()),
+            true => ProcToken::Text(std::iter::once(b'"').chain(lexer.get_until(b'"')?).chain(std::iter::once(b'"')).collect()),
             false => match get_stripped_not(lexer, &mut scope.line_number, b'\r')? {
                 b'(' => ProcToken::LeftParenthesis,
                 b')' => ProcToken::RightParenthesis,
-                b'"' => { scope.quoted = true; ProcToken::next_token(lexer, scope)? },
+                b',' => ProcToken::Comma,
+                b'"' => { scope.quoted = true; <ProcToken as ScopedToken<u8>>::next_token(lexer, scope)? },
                 b'\n' => { scope.line_number += 1; ProcToken::NewLine },
                 b'#' => match get_stripped(lexer, &mut scope.line_number)? {
                     b'#' => ProcToken::DoubleHash,
@@ -158,7 +159,7 @@ impl ScopedToken<u8> for ProcToken {
                         }
                     }
                 }
-
+                unknown => ProcToken::Unknown(vec![unknown]),
             }
         };
         if scope.new_line && token != ProcToken::NewLine {
