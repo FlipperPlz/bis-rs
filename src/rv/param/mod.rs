@@ -1,7 +1,7 @@
 pub mod lexer;
 
+use std::collections::HashMap;
 use std::hash::Hash;
-use std::ops;
 pub use lexer::*;
 pub mod parser; pub use parser::*;
 
@@ -10,6 +10,7 @@ type ValueSet = Vec<ParamExpression>;
 
 pub struct ParamFile {
     name:               Vec<u8>,
+    internals:          HashMap<Vec<u8>, i32>,
     nodes:              NodeSet
 }
 
@@ -51,7 +52,7 @@ impl ParamContext for ParamClass {
 }
 
 trait ParamContext {
-    fn name(&self) -> &String;
+    fn name(&self) -> &Vec<u8>;
 
     fn nodes(&self) -> &NodeSet;
 

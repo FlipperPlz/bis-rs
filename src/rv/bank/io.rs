@@ -1,57 +1,150 @@
-pub mod error;       pub use error::*;
-pub mod options;     pub use options::*;
-pub mod encryption;  pub use encryption::*;
 
 use std::collections::HashMap;
-use std::io;
 use std::io::{Read, Seek};
 use byteorder::{LittleEndian, ReadBytesExt};
-use crate::{BANK_DIR, Debinarizable, DebinarizePredicateOption, magic_enum, MAX_PATH_LENGTH, path};
-use crate::options::{BankSkimOptions, OffsetLocationStrategy};
+use crate::{BankSkimEntry, Debinarizable, DebinarizationOptions, DebinarizePredicateOption, EntryMime, magic_enum, PboFileSkim};
+use std::io;
+use thiserror::Error;
+
+const WIN_DIR: char = '\\';
+const UNIX_DIR: char = '/';
+pub const BANK_DIR: char = UNIX_DIR;
+pub const MAX_PATH_LENGTH: u16 = 1023;
+#[derive(Error, Debug)]
+pub enum BankSkimError {
+    #[error("Bank Debinarization Error: The current options are configured to require a version entry to be the first in the bank.")]
+    FirstNotVersion,
+    #[error("Bank Debinarization Error: The current options are configured to require a version entry but none were found.")]
+    VersionNotFound,
+    #[error("Bank Debinarization Error: Multiple version entries were found within the bank supplied, but this is configured to be disabled.")]
+    MultipleVersionsFound,
+    #[error("Bank Debinarization Error: The current options are configured to error out when offsets are invalidated.")]
+    ImpossibleDataOffset,
+    #[error("Bank Debinarization Error: Version entry found with additional info, this is configured to throw an error.")]
+    VersionNotBlanked,
+    #[error("Bank Debinarization Error: The checksum does not match the one calculated.")]
+    InvalidChecksum,
+    #[error("Bank Debinarization Error: The options are configured to forbid obfuscated banks.")]
+    Obfuscated,
+    #[error(transparent)]
+    EntryDebinarization(#[from] EntryMetadataError),
+}
+
+#[derive(Error, Debug)]
+pub enum EntryError {
+    #[error("Entry Read Error: The provided offset for the entry is invalid. ")]
+    SeekFailed,
+    #[error("Entry Read Error: The provided entry was not found in the bank.")]
+    EntryNotFound,
+
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum OffsetLocationStrategy {
+    Deprecated,
+    Calculate
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct BankSkimOptions {
+    pub(crate) offset_location_strategy:   OffsetLocationStrategy,
+    pub(crate) allow_offsets_to_header:    bool,
+    pub(crate) remove_impossible_offsets:  bool,
+    pub(crate) require_version_first:      bool,
+    pub(crate) require_version_entry:      bool,
+    pub(crate) ignore_unused_properties:   bool,
+    pub(crate) max_entry_count:            usize,
+    pub(crate) remove_empty_entries:       bool,
+    pub(crate) allow_obfuscated:           bool,
+    pub(crate) require_valid_checksum:     bool,
+}
+
+impl Default for BankSkimOptions {
+    fn default() -> Self {
+        Self {
+            offset_location_strategy: OffsetLocationStrategy::Deprecated,
+            allow_offsets_to_header: false,
+            remove_impossible_offsets: false,
+            require_version_first: false,
+            require_version_entry: false,
+            ignore_unused_properties: false,
+            max_entry_count: usize::MAX,
+            remove_empty_entries: false,
+            allow_obfuscated: false,
+            require_valid_checksum: false,
+        }
+    }
+}
+
+impl DebinarizationOptions for BankSkimOptions {
+
+}
+
+
+
+#[derive(Debug, Error)]
+pub enum EntryMetadataError {
+    #[error("Bank Debinarization Error: Entry mime not supported: {0}")]
+    EntryMimeNotSupported(i32),
+    #[error("Bank Debinarization Error: The options are configured to forbid obfuscated entries.")]
+    Obfuscated,
+    #[error("Invalid Name")]
+    EntryNameError(
+        #[from] EntryNameError
+    ),
+    #[error("Invalid Encryption")]
+    EncryptionError(
+        #[from] BankEncryptionError
+    ),
+    #[error(transparent)]
+    IO(
+        #[from] io::Error
+    )
+}
+
+#[derive(Debug, Error)]
+pub enum BankEncryptionError {
+    #[error("The encryption format of this pbo is not supported")]
+    NotSupported
+}
+
+#[derive(Debug, Error)]
+pub enum EntryNameError {
+    #[error("An entry was found with a weird name. I dont know how to handle this yet or if its possible.")]
+    Underflow,
+    #[error(transparent)]
+    IO(
+        #[from] io::Error
+    )
+}
 
 pub const HEADER_PREFIX_MAGIC: &str = "prefix";
+const HEADER_ENCRYPTION_MAGIC: &str = "hprotect";
+const SERIAL_MAGIC: &str = "registry";
+const PADDING_NAME: &str = "___dummypadding___";
+const ENCRYPTION_MAGIC: &str = "encryption";
 
-#[derive(Eq, PartialEq, Hash, Clone, Debug)]
-pub struct BankSkimEntry {
-    pub(crate) filename:      String,
-    pub(crate) mime: EntryMime,
-    pub(crate) size_unpacked: u32,
-    pub(crate) start_offset:  u64,
-    pub(crate) timestamp:     u32,
-    pub(crate) size_packed:   u32,
+
+pub enum EncryptionType {
+    Header {
+        version: i32
+    },
+    Data {
+        headers_size: i32,
+        encoded_headers_size: i32
+    },
+    None
 }
 
-magic_enum! {
-    i32,
-    EntryMime,
-    EntryMetadataError,
-    EntryMimeNotSupported {
-        Decompressed = 0x00000000,
-        Compressed   = 0x43707273,
-        Encrypted    = 0x456e6372,
-        Version      = 0x56657273
-    }
-}
+pub fn get_encryption_mode<R: Read + Seek>(reader: &mut PboReader<R>, properties: &HashMap<String, String>) -> Result<EncryptionType, EntryMetadataError> {
 
-
-#[derive(Clone, Debug)]
-pub struct PboFileSkim<R: Read + Seek> {
-    pub(crate) reader:        PboReader<R>,
-    pub(crate) entries:       HashMap<BankSkimEntry, u64>,
-    pub(crate) options:       BankSkimOptions,
-    pub(crate) properties:    HashMap<String, String>
-}
-
-impl<R: Read + Seek> PboFileSkim<R> {
-    pub fn get_entry(&self, entry_name: &str) -> Option<&BankSkimEntry> {
-        self.entries.keys().find(|&entry| {
-            entry.filename.eq_ignore_ascii_case(entry_name)
-        })
-    }
-
-    pub fn read_entry(&mut self, entry: &BankSkimEntry) -> Result<Vec<u8>, EntryError> {
-        self.reader.read_entry_data(entry, self.entries.get(entry).unwrap())
-    }
+    // match properties.get(HEADER_ENCRYPTION_MAGIC) {
+    //     None => {}
+    //     Some(value) => {
+    //         let version = reader.read_i32::<LittleEndian>()?;
+    //     }
+    // }
+    Ok(EncryptionType::None)
 }
 
 
@@ -128,7 +221,7 @@ impl<R: Read + Seek> PboReader<R> {
                             Ok(DebinarizePredicateOption::Break)
                         }
                     } else { first = false; }
-                    e.filename = path::convert_dir_slash(&e.filename);
+                    e.filename = convert_dir_slash(&e.filename);
                     Ok(DebinarizePredicateOption::Ok)
                 }
             })?;
@@ -238,4 +331,44 @@ fn is_version(entry: &BankSkimEntry) -> bool {
 #[inline]
 fn empty_name(entry: &BankSkimEntry) -> bool {
     entry.filename.is_empty()
+}
+
+#[inline]
+pub fn normalize_path(path: &str, directory: bool) -> String {
+    if path.is_empty() {
+        return path.to_string();
+    }
+
+    let mut result = Vec::with_capacity(path.len());
+    let mut last_was_separator = true;
+
+    for c in path.chars() {
+        match c {
+            UNIX_DIR | WIN_DIR => {
+                if last_was_separator { continue }
+
+                result.push(WIN_DIR);
+                last_was_separator = true;
+            },
+            _ => {
+                last_was_separator = false;
+                result.push(c.to_ascii_lowercase());
+            }
+        }
+    }
+
+    if !directory && !result.is_empty() && *result.last().unwrap() == WIN_DIR {
+        result.pop();
+    }
+
+    result.iter().collect()
+}
+
+#[inline]
+pub fn convert_dir_slash(name: &String) -> String {
+    if !name.contains(UNIX_DIR) {
+        return name.clone();
+    }
+
+    name.replace(UNIX_DIR, "\\")
 }

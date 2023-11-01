@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::fmt::{Debug};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
+use std::io::Cursor;
 use std::path::Path;
-use async_std::io as aio;
 use crate::{BankSkimEntry, EntryMime, HEADER_PREFIX_MAGIC, PboFileSkim, PboReader};
 use crate::fs::error::BankLoadError;
 use crate::options::BankSkimOptions;
@@ -21,7 +21,7 @@ struct BankFileMeta {
     skim:              PboFileSkim<File>,
     prefix:            String,
     changed_prefix:    Option<String>,
-    open_entries:      HashMap<CachedEntry, aio::Cursor<Vec<u8>>>,
+    open_entries:      HashMap<CachedEntry, Cursor<Vec<u8>>>,
     deleted_entries:   Vec<String>,
 }
 
