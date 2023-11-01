@@ -8,19 +8,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3fb9c263-a9c4-4f5b-8375-e8c02d850b49" name="Changes" comment="feat(preproc): Finish Up Include, Undefine, And Comments">
-      <change afterPath="$PROJECT_DIR$/lib/bex/src/process.rs" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/rv/process/process.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/bex" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/bex/src/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/bex/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/parse.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/bex/src/process.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/process.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/bex/src/read.rs" beforeDir="false" afterPath="$PROJECT_DIR$/lib/bex/src/read.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/param/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/param/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/process/define.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/process/error.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/process/io.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/rv/process/lexer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/lexer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rv/process/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/rv/process/process.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/rv/process/process.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -62,23 +56,25 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Cargo.build.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;bex&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
-    &quot;org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs&quot;: &quot;true&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.build.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "bex",
+    "ignore.virus.scanning.warn.message": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/core/io/text_read/BOStream.rs": "true",
+    "org.rust.disableDetachedFileInspectionE:/projects/rust/bis-rs/src/rv/process/lexer.rs": "true",
+    "settings.editor.selected.configurable": "preferences.lookFeel",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
@@ -118,7 +114,12 @@
       <workItem from="1698380973637" duration="42000" />
       <workItem from="1698385801874" duration="612000" />
       <workItem from="1698791430680" duration="119000" />
-      <workItem from="1698792063188" duration="3443000" />
+      <workItem from="1698792063188" duration="5822000" />
+      <workItem from="1698840277350" duration="156000" />
+      <workItem from="1698840455594" duration="111000" />
+      <workItem from="1698840580482" duration="76000" />
+      <workItem from="1698840693005" duration="2348000" />
+      <workItem from="1698843246152" duration="9630000" />
     </task>
     <task id="LOCAL-00001" summary="feat(preproc): Add Back RV Preprocessor Features">
       <option name="closed" value="true" />

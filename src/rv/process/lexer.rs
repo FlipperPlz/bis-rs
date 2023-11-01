@@ -1,124 +1,170 @@
 use std::io;
-use bex::{Analyser, Lexer, ScopedToken};
+use bex::{Analyser, Lexer, ScopedToken, Token};
 use thiserror::Error;
 
-type LexerResult<T> = Result<T, ProcLexicalError>;
+type LexerResult<T> = Result<T, ProcError>;
 
 #[derive(Error, Debug)]
-pub enum ProcLexicalError {
+pub enum ProcError {
     #[error(transparent)]
     IO(#[from] io::Error),
     #[error("Unknown Directive Encountered")]
     UnknownDirective(Vec<u8>),
     #[error("Missing Space In Directive Body")]
     MissingSpace,
+    #[error("Expected Identifier but found char outside of range.")]
+    ExpectedId,
     #[error("Expected ., instead got .")]
     ExpectedText(),
     #[error("Expected ., instead got .")]
     UnexpectedChar(u8)
 }
 
-pub struct ProcLexicalScope {
-    line_number: u32,
-    quoted:      bool
+#[derive(PartialEq)]
+pub struct ProcScope {
+    pub line_number:    u32,
+    pub quoted:         bool,
+    pub new_line:       bool
 }
 
+#[derive(PartialEq)]
 pub struct ProcMacroDefinition {
-    macro_name: Vec<u8>,
-    macro_params: Vec<Vec<u8>>
+    pub macro_name:    Vec<u8>,
+    pub macro_params:  Vec<Vec<u8>>
 }
 
+#[derive(PartialEq)]
 pub struct ProcMacro {
-    definition: ProcMacroDefinition,
-    value:      Vec<u8>
+    pub definition: ProcMacroDefinition,
+    pub value:      Vec<u8>
 }
 
+#[derive(PartialEq)]
 pub struct ProcIfBlock {
-    negated:      bool,
-    target:       Vec<u8>,
-    if_section:   Vec<u8>,
-    else_section: Option<Vec<u8>>
+    pub negated:      bool,
+    pub target:       Vec<u8>,
+    pub if_section:   Vec<u8>,
+    pub else_section: Option<Vec<u8>>
 }
 
+#[derive(PartialEq)]
 pub struct ProcInclude {
-    using_angles: bool,
-    path:         Vec<u8>
+    pub using_angles: bool,
+    pub path:         Vec<u8>
 }
 
+#[derive(PartialEq)]
 pub enum ProcToken {
-    Include(ProcInclude), Define(ProcMacro), IfBlock(ProcIfBlock),
-    Undefine(Vec<u8>), Identifier(Vec<u8>), Text(Vec<u8>), Unknown(Vec<u8>),
-    LineBreak, Comment
+    Include(ProcInclude), Define(ProcMacro), IfBlock(ProcIfBlock), Text(Vec<u8>),
+    Undefine(Vec<u8>), Identifier(Vec<u8>), Unknown(Vec<u8>), DoubleHash,
+    NewLine, LineBreak, Comment, LeftParenthesis, RightParenthesis, Comma
 }
 
-impl Default for ProcLexicalScope {
+impl Default for ProcScope {
     fn default() -> Self {
         Self {
             line_number: 0,
             quoted: false,
+            new_line: true
         }
     }
+}
+
+fn read_macro_name(
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcScope
+) -> LexerResult<Vec<u8>> {
+    let next = get_stripped(lexer, &mut scope.line_number)?;
+    if !valid_id_char(next, true) {
+        return Err(ProcError::ExpectedId)
+    }
+    Ok(get_name(lexer, &mut scope.line_number, Some(next), 128)?)
 }
 
 impl ScopedToken<u8> for ProcToken {
-    type Scope = ProcLexicalScope;
-    type Error = ProcLexicalError;
+    type Scope = ProcScope;
+    type Error = ProcError;
 
     fn next_token(
         lexer: &mut Lexer<u8>,
-        scope: &mut Self::Scope
+        scope: &mut ProcScope
     ) -> Result<Self, Self::Error> {
-        if scope.quoted {
-            let text = ProcToken::Text(std::iter::once(b'"')
-                .chain(lexer.get_until(b'\"')?.into_iter())   // text is being converted into an iterator
-                .chain(std::iter::once(b'"')).collect::<Vec<u8>>());
-            scope.quoted = false;  lexer.step_forward()?;
-            return Ok(text)
-        }
-
-        let mut current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
-        if valid_id_char(current, true) {
-            return Ok(ProcToken::Identifier(get_name(lexer, &mut scope.line_number, Some(current), 128)?))
-        }
-
-        return match current {
-            b'#' => {
-                if lexer.take(&b'#')? { read_macro(lexer, scope) }
-                else { next_directive(lexer, scope) }
-            }
-            b'"' => {
-                scope.quoted = true;
-                Self::next_token(lexer, scope)
-            }
-            b'/' => {
-                current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
-                if current == b'/' { read_line_comment(lexer, scope) }
-                else if current == b'*' { read_delimited_comment(lexer, scope)}
-                else { Ok(ProcToken::Unknown(vec![b'/'])) }
-            }
-            b'\\' => {
-                current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
-                if current == b'\n' {
-                    return Ok(ProcToken::LineBreak)
+        let token = match scope.quoted {
+            true => ProcToken::Text(std::iter::once(b'"').chain(lexer.get_until(b'"')).chain(std::iter::once(b'"')).collect()),
+            false => match get_stripped_not(lexer, &mut scope.line_number, b'\r')? {
+                b'(' => ProcToken::LeftParenthesis,
+                b')' => ProcToken::RightParenthesis,
+                b'"' => { scope.quoted = true; ProcToken::next_token(lexer, scope)? },
+                b'\n' => { scope.line_number += 1; ProcToken::NewLine },
+                b'#' => match get_stripped(lexer, &mut scope.line_number)? {
+                    b'#' => ProcToken::DoubleHash,
+                    next if scope.new_line && valid_id_char(next, true) => {
+                        match get_name(lexer, &mut scope.line_number, Some(next), 128)?.as_slice() {
+                            b"include" if skip_space(lexer)? => {
+                                let terminator = match get_stripped(lexer, &mut scope.line_number)? {
+                                    b'<' => b'>',
+                                    current if current == b'"' => current,
+                                    tok => return Err(ProcError::UnexpectedChar(tok))
+                                };
+                                let path=iterate_by_condition(lexer, &mut scope.line_number, 128, None, |current|
+                                    current == terminator
+                                )?;
+                                ProcToken::Include(ProcInclude {
+                                    using_angles: terminator == b'>',
+                                    path
+                                })
+                            },
+                            b"define" if skip_space(lexer)? => todo!(),
+                            b"ifdef" => read_if(lexer, scope, false)?,
+                            b"ifndef" => read_if(lexer, scope, true)?,
+                            b"undef" =>  ProcToken::Undefine(read_macro_name(lexer, scope)?),
+                            directive => ProcToken::Text({
+                                let mut text = Vec::new();
+                                text.push(b'#');
+                                text.extend_from_slice(directive);
+                                text
+                            })
+                        }
+                    }
+                    _ => { lexer.step_back()?; ProcToken::Text(vec![b'#']) }
+                },
+                current if valid_id_char(current, true) => ProcToken::Identifier(get_name(lexer, &mut scope.line_number, Some(current), 128)?),
+                current if current == b'\\' || current == b'/' => {
+                    let is_forward = current == b'/';
+                    match get_stripped_not(lexer, &mut scope.line_number, b'\r')? {
+                        b'/' if is_forward => {
+                            lexer.seek_until(b'\n')?;
+                            ProcToken::Comment
+                        },
+                        b'*' if is_forward => {
+                            let mut current = lexer.get()?;
+                            let mut last: u8 = 0;
+                            while last != b'*' || current != b'/' {
+                                last = current;
+                                current = lexer.get()?;
+                                if current == b'\n' {
+                                    scope.line_number += 1;
+                                }
+                            }
+                            ProcToken::Comment
+                        },
+                        b'\n' if !is_forward => {
+                            scope.line_number += 1;
+                            ProcToken::LineBreak
+                        },
+                        _ => {
+                            lexer.step_back()?;
+                            ProcToken::Unknown(vec![current])
+                        }
+                    }
                 }
-                return Ok(ProcToken::Text(vec![b'\\', current]))
-            }
-            content => Ok(ProcToken::Unknown(vec![content]))
-        }
-    }
-}
 
-fn next_directive(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    match get_name(lexer, &mut scope.line_number, None, 128)?.as_slice() {
-        b"include" => read_include(lexer, scope),
-        b"define" => read_define(lexer, scope),
-        b"ifdef" => read_if(lexer, scope, false),
-        b"ifndef" => read_if(lexer, scope, true),
-        b"undef" => read_undefine(lexer, scope),
-        directive => Err(ProcLexicalError::UnknownDirective(Vec::from(directive)))
+            }
+        };
+        if scope.new_line && token != ProcToken::NewLine {
+            scope.new_line = false;
+        }
+        Ok(token)
     }
 }
 
@@ -135,105 +181,18 @@ fn skip_space(lexer: &mut Lexer<u8>) -> LexerResult<bool> {
     Ok(found_space)
 }
 
-fn read_macro(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    todo!()
-}
-
-fn read_define(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    todo!()
-}
 
 fn read_if(
     lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope,
+    scope: &mut ProcScope,
     negated: bool
 ) -> LexerResult<ProcToken> {
     if !skip_space(lexer)? {
-        return Err(ProcLexicalError::MissingSpace)
+        return Err(ProcError::MissingSpace)
     }
     todo!()
 }
 
-fn read_include(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    if !skip_space(lexer)? {
-        return Err(ProcLexicalError::MissingSpace)
-    }
-    let angled = match get_stripped(lexer, &mut scope.line_number)? {
-        b'<' => true,
-        b'"' => false,
-        tok => return Err(ProcLexicalError::UnexpectedChar(tok))
-    };
-    let path = get_string(
-        lexer,
-        &mut scope.line_number,
-        None,
-    128,
-        if angled {
-            b">"
-        } else {
-            b"\""
-        }
-    )?;
-    return Ok(ProcToken::Include(ProcInclude {
-        using_angles: angled,
-        path
-    }));
-}
-
-fn read_undefine(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    if !skip_space(lexer)? {
-        return Err(ProcLexicalError::MissingSpace)
-    }
-    let macro_name = match ProcToken::next_token(lexer, scope)? {
-        ProcToken::Text(it) => it,
-        tok => return Err(ProcLexicalError::ExpectedText())
-    };
-
-    return Ok(ProcToken::Undefine(macro_name));
-}
-
-
-fn read_delimited_comment(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    let mut current = lexer.get()?;
-    let mut last: u8 = 0;
-    while last != b'*' || current != b'/' {
-        last = current;
-        current = lexer.get()?;
-        if current == b'\n' {
-            scope.line_number += 1;
-        }
-    }
-
-    return Ok(ProcToken::Comment)
-}
-
-fn read_line_comment(
-    lexer: &mut Lexer<u8>,
-    scope: &mut ProcLexicalScope
-) -> LexerResult<ProcToken> {
-    let mut current = lexer.get()?;
-    while current != b'\n' {
-        current = lexer.get()?;
-    }
-    scope.line_number += 1;
-
-    return Ok(ProcToken::Comment)
-}
 
 fn get_stripped(
     lexer: &mut Lexer<u8>,
@@ -286,18 +245,6 @@ fn iterate_by_condition(
     }
     lexer.step_back()?;
     Ok(buffer)
-}
-
-fn get_string(
-    lexer: &mut Lexer<u8>,
-    line_count: &mut u32,
-    use_first: Option<u8>,
-    max_size: u32,
-    terminators: &[u8],
-) -> LexerResult<Vec<u8>> {
-    iterate_by_condition(lexer, line_count, max_size, use_first, |current|
-        !terminators.contains(&current)
-    )
 }
 
 fn get_name(
