@@ -1,6 +1,5 @@
 use std::io;
-use bex::lexer::{Lexer, ScopedToken, Token};
-use bex::read::Analyser;
+use bex::{Analyser, Lexer, ScopedToken};
 use thiserror::Error;
 
 type LexerResult<T> = Result<T, ProcLexicalError>;
@@ -13,10 +12,10 @@ pub enum ProcLexicalError {
     UnknownDirective(Vec<u8>),
     #[error("Missing Space In Directive Body")]
     MissingSpace,
-    #[error("Expected Text token, instead got {0}.")]
-    ExpectedText(ProcLexicalToken),
-    #[error("Expected {2}, instead got {1}.")]
-    UnexpectedChar(char, [char])
+    #[error("Expected ., instead got .")]
+    ExpectedText(),
+    #[error("Expected ., instead got .")]
+    UnexpectedChar(u8)
 }
 
 pub struct ProcLexicalScope {
@@ -46,14 +45,22 @@ pub struct ProcInclude {
     path:         Vec<u8>
 }
 
-pub enum ProcLexicalToken {
+pub enum ProcToken {
     Include(ProcInclude), Define(ProcMacro), IfBlock(ProcIfBlock),
     Undefine(Vec<u8>), Identifier(Vec<u8>), Text(Vec<u8>), Unknown(Vec<u8>),
     LineBreak, Comment
 }
 
+impl Default for ProcLexicalScope {
+    fn default() -> Self {
+        Self {
+            line_number: 0,
+            quoted: false,
+        }
+    }
+}
 
-impl ScopedToken<u8> for ProcLexicalToken {
+impl ScopedToken<u8> for ProcToken {
     type Scope = ProcLexicalScope;
     type Error = ProcLexicalError;
 
@@ -62,39 +69,41 @@ impl ScopedToken<u8> for ProcLexicalToken {
         scope: &mut Self::Scope
     ) -> Result<Self, Self::Error> {
         if scope.quoted {
-            let text = ProcLexicalToken::Text(std::iter::once(b'"').chain(lexer.get_until(b'\"').into_iter()).chain(std::iter::once(b'"')).collect());
-            scope.quoted = false; lexer.step_forward()?;
+            let text = ProcToken::Text(std::iter::once(b'"')
+                .chain(lexer.get_until(b'\"')?.into_iter())   // text is being converted into an iterator
+                .chain(std::iter::once(b'"')).collect::<Vec<u8>>());
+            scope.quoted = false;  lexer.step_forward()?;
             return Ok(text)
         }
 
         let mut current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
         if valid_id_char(current, true) {
-            return Ok(ProcLexicalToken::Identifier(get_name(lexer, &mut scope.line_number, Some(current), 128)?))
+            return Ok(ProcToken::Identifier(get_name(lexer, &mut scope.line_number, Some(current), 128)?))
         }
 
         return match current {
             b'#' => {
-                if lexer.take(&b'#') { read_macro(lexer, scope) }
+                if lexer.take(&b'#')? { read_macro(lexer, scope) }
                 else { next_directive(lexer, scope) }
             }
             b'"' => {
                 scope.quoted = true;
-                Self::next_token(lexer, scope);
+                Self::next_token(lexer, scope)
             }
             b'/' => {
                 current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
                 if current == b'/' { read_line_comment(lexer, scope) }
                 else if current == b'*' { read_delimited_comment(lexer, scope)}
-                else { Ok(ProcLexicalToken::Unknown(Vec::from(b'/'))) }
+                else { Ok(ProcToken::Unknown(vec![b'/'])) }
             }
             b'\\' => {
                 current = get_stripped_not(lexer, &mut scope.line_number, 0x0d)?;
                 if current == b'\n' {
-                    return Ok(ProcLexicalToken::LineBreak)
+                    return Ok(ProcToken::LineBreak)
                 }
-                return Ok(ProcLexicalToken::Text(vec![b'\\', current]))
+                return Ok(ProcToken::Text(vec![b'\\', current]))
             }
-            content => Ok(ProcLexicalToken::Unknown(Vec::from(content)))
+            content => Ok(ProcToken::Unknown(vec![content]))
         }
     }
 }
@@ -102,13 +111,13 @@ impl ScopedToken<u8> for ProcLexicalToken {
 fn next_directive(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
+) -> LexerResult<ProcToken> {
     match get_name(lexer, &mut scope.line_number, None, 128)?.as_slice() {
         b"include" => read_include(lexer, scope),
         b"define" => read_define(lexer, scope),
         b"ifdef" => read_if(lexer, scope, false),
         b"ifndef" => read_if(lexer, scope, true),
-        b"undef" => read_undefine(lexer),
+        b"undef" => read_undefine(lexer, scope),
         directive => Err(ProcLexicalError::UnknownDirective(Vec::from(directive)))
     }
 }
@@ -129,14 +138,14 @@ fn skip_space(lexer: &mut Lexer<u8>) -> LexerResult<bool> {
 fn read_macro(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
+) -> LexerResult<ProcToken> {
     todo!()
 }
 
 fn read_define(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
+) -> LexerResult<ProcToken> {
     todo!()
 }
 
@@ -144,25 +153,24 @@ fn read_if(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope,
     negated: bool
-) -> LexerResult<ProcLexicalToken> {
-    if !skip_space(lexer) {
+) -> LexerResult<ProcToken> {
+    if !skip_space(lexer)? {
         return Err(ProcLexicalError::MissingSpace)
     }
     todo!()
 }
 
-
 fn read_include(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
-    if !skip_space(lexer) {
+) -> LexerResult<ProcToken> {
+    if !skip_space(lexer)? {
         return Err(ProcLexicalError::MissingSpace)
     }
-    let angled = match *get_stripped(lexer, &mut scope.line_number) {
+    let angled = match get_stripped(lexer, &mut scope.line_number)? {
         b'<' => true,
         b'"' => false,
-        tok => return Err(ProcLexicalError::UnexpectedChar(tok, *['<', '"']))
+        tok => return Err(ProcLexicalError::UnexpectedChar(tok))
     };
     let path = get_string(
         lexer,
@@ -175,31 +183,32 @@ fn read_include(
             b"\""
         }
     )?;
-    return Ok(ProcLexicalToken::Include(ProcInclude {
+    return Ok(ProcToken::Include(ProcInclude {
         using_angles: angled,
         path
     }));
 }
 
 fn read_undefine(
-    lexer: &mut Lexer<u8>
-) -> LexerResult<ProcLexicalToken> {
-    if !skip_space(lexer) {
+    lexer: &mut Lexer<u8>,
+    scope: &mut ProcLexicalScope
+) -> LexerResult<ProcToken> {
+    if !skip_space(lexer)? {
         return Err(ProcLexicalError::MissingSpace)
     }
-    let macro_name = match ProcLexicalToken::next_token(lexer) {
-        ProcLexicalToken::Text(it) => it,
-        tok => return Err(ProcLexicalError::ExpectedText(tok))
+    let macro_name = match ProcToken::next_token(lexer, scope)? {
+        ProcToken::Text(it) => it,
+        tok => return Err(ProcLexicalError::ExpectedText())
     };
 
-    return Ok(ProcLexicalToken::Undefine(macro_name));
+    return Ok(ProcToken::Undefine(macro_name));
 }
 
 
 fn read_delimited_comment(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
+) -> LexerResult<ProcToken> {
     let mut current = lexer.get()?;
     let mut last: u8 = 0;
     while last != b'*' || current != b'/' {
@@ -210,20 +219,20 @@ fn read_delimited_comment(
         }
     }
 
-    return Ok(ProcLexicalToken::Comment)
+    return Ok(ProcToken::Comment)
 }
 
 fn read_line_comment(
     lexer: &mut Lexer<u8>,
     scope: &mut ProcLexicalScope
-) -> LexerResult<ProcLexicalToken> {
+) -> LexerResult<ProcToken> {
     let mut current = lexer.get()?;
     while current != b'\n' {
         current = lexer.get()?;
     }
     scope.line_number += 1;
 
-    return Ok(ProcLexicalToken::Comment)
+    return Ok(ProcToken::Comment)
 }
 
 fn get_stripped(
@@ -232,12 +241,12 @@ fn get_stripped(
 ) -> LexerResult<u8> {
     let mut current = lexer.get_not(b'\r')?;
     while current == b'\\' {
-        if *lexer.get_not(b'\r')? != b'\n' {
+        if lexer.get_not(b'\r')? != b'\n' {
             lexer.step_back()?;
             return Ok(b'\r')
         }
         *line_count += 1;
-        current = *lexer.get_not(b'\r')?
+        current = lexer.get_not(b'\r')?
     }
     Ok(current)
 }
@@ -260,7 +269,7 @@ fn iterate_by_condition(
     line_count: &mut u32,
     max_size: u32,
     use_first: Option<u8>,
-    check_condition: impl Fn(u8) -> bool
+    mut check_condition: impl FnMut(u8) -> bool
 ) -> LexerResult<Vec<u8>> {
     let mut max_size = max_size;
     let mut buffer: Vec<u8> = vec![];

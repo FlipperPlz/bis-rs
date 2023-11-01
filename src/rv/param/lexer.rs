@@ -39,7 +39,7 @@ impl ScopedToken<u8> for ParamToken {
     type Scope = ParamLexicalScope;
     type Error = ParamLexerError;
 
-    fn next_token(lexer: &mut Lexer<u8>, scope: &Self::Scope) -> Result<Self, Self::Error> {
+    fn next_token(lexer: &mut Lexer<u8>, scope: &mut Self::Scope) -> Result<Self, Self::Error> {
         match scope {
             ParamLexicalScope::Statement => next_statement(lexer),
             ParamLexicalScope::Expression => next_expression(lexer, false),
@@ -85,7 +85,7 @@ pub fn take_word(lexer: &mut Lexer<u8>) -> LexerResult<&[u8]> {
     while current == b'_' || is_alphanumeric(&current) {
         current = lexer.get()?;
     }
-    return Ok(&lexer.contents()[start..*lexer.pos()]);
+    return Ok(&lexer.contents()[start..lexer.pos()]);
 }
 
 #[inline]
